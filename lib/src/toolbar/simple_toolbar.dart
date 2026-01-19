@@ -69,18 +69,21 @@ class QuillSimpleToolbar extends StatelessWidget
               controller: controller,
               baseOptions: config.buttonOptions.base,
             ),
-          QuillToolbarUserMentionButton(
-            controller: controller,
-            baseOptions: config.buttonOptions.base,
-          ),
-          QuillToolbarHashtagButton(
-            controller: controller,
-            baseOptions: config.buttonOptions.base,
-          ),
-          QuillToolbarDollarTagButton(
-            controller: controller,
-            baseOptions: config.buttonOptions.base,
-          ),
+          if (config.showUserTag)
+            QuillToolbarUserMentionButton(
+              controller: controller,
+              baseOptions: config.buttonOptions.base,
+            ),
+          if (config.showHashTag)
+            QuillToolbarHashtagButton(
+              controller: controller,
+              baseOptions: config.buttonOptions.base,
+            ),
+          if (config.showDollarTag)
+            QuillToolbarDollarTagButton(
+              controller: controller,
+              baseOptions: config.buttonOptions.base,
+            ),
           if (config.showRedo)
             QuillToolbarHistoryButton(
               isUndo: false,
