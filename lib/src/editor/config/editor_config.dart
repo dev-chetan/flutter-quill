@@ -19,6 +19,7 @@ import '../widgets/delegate.dart';
 import '../widgets/link.dart' hide linkPrefixes;
 import '../widgets/text/magnifier.dart';
 import '../widgets/text/utils/text_block_utils.dart';
+import 'mention_tag_config.dart';
 import 'search_config.dart';
 
 // IMPORTANT For project authors: The QuillEditorConfig.copyWith()
@@ -86,6 +87,7 @@ class QuillEditorConfig {
     this.readOnlyMouseCursor = SystemMouseCursors.text,
     this.onPerformAction,
     @experimental this.customLeadingBlockBuilder,
+    this.mentionTagConfig,
   });
 
   @experimental
@@ -384,6 +386,9 @@ class QuillEditorConfig {
   /// page for docs.
   @experimental
   final QuillSearchConfig searchConfig;
+
+  /// Configuration for mention (@) and tag (#) functionality
+  final MentionTagConfig? mentionTagConfig;
 
   /// Delegate function responsible for showing menu with link actions on
   /// mobile platforms (iOS, Android).

@@ -607,14 +607,91 @@ class _TextLineState extends State<TextLine> {
       }
     }
 
-    if (color != null && color.value != null) {
-      var textColor = defaultStyles.color;
-      if (color.value is String) {
-        textColor = stringToColor(color.value, null, defaultStyles);
+    // Check if mention attribute exists (regardless of color)
+    final mention = nodeStyle.attributes[Attribute.mention.key];
+    final hasMention = mention != null && mention.value != null && mention.value is Map;
+    
+    // Check if tag attribute exists (regardless of color) - for # tags
+    final tag = nodeStyle.attributes[Attribute.tag.key];
+    final hasTag = tag != null && tag.value != null && tag.value is Map;
+
+    // Check if currency attribute exists (regardless of color) - for $ tags
+    final currency = nodeStyle.attributes[Attribute.currency.key];
+    final hasCurrency = currency != null && currency.value != null && currency.value is Map;
+
+    // Apply mention color only if mention attribute exists AND has color
+    Color? mentionColor;
+    if (hasMention) {
+      final mentionData = mention!.value as Map<String, dynamic>;
+      final mentionColorString = mentionData['color'] as String?;
+      if (mentionColorString != null && mentionColorString.isNotEmpty) {
+        try {
+          mentionColor = stringToColor(mentionColorString, null, defaultStyles);
+        } catch (e) {
+          // Ignore invalid color strings
+        }
       }
-      if (textColor != null) {
-        res = res.merge(TextStyle(color: textColor));
+    }
+
+    // Apply tag color only if tag attribute exists AND has color, AND no mention exists
+    Color? tagColor;
+    if (hasTag && !hasMention) {
+      final tagData = tag!.value as Map<String, dynamic>;
+      final tagColorString = tagData['color'] as String?;
+      if (tagColorString != null && tagColorString.isNotEmpty) {
+        try {
+          tagColor = stringToColor(tagColorString, null, defaultStyles);
+        } catch (e) {
+          // Ignore invalid color strings
+        }
       }
+    }
+
+    // Apply currency color only if currency attribute exists AND has color, AND no mention/tag exists
+    Color? currencyColor;
+    if (hasCurrency && !hasMention && !hasTag) {
+      final currencyData = currency!.value as Map<String, dynamic>;
+      final currencyColorString = currencyData['color'] as String?;
+      if (currencyColorString != null && currencyColorString.isNotEmpty) {
+        try {
+          currencyColor = stringToColor(currencyColorString, null, defaultStyles);
+        } catch (e) {
+          // Ignore invalid color strings
+        }
+      }
+    }
+
+    // Apply colors in priority order:
+    // 1. Mention color (if mention exists and has color)
+    // 2. Tag color (if tag exists, has color, and no mention)
+    // 3. Currency color (if currency exists, has color, and no mention/tag)
+    // 4. Regular color attribute (if no mention/tag/currency)
+    // 5. Default color (if mention/tag/currency exists but has no color, or no attributes at all)
+    if (mentionColor != null) {
+      // Mention has explicit color
+      res = res.merge(TextStyle(color: mentionColor));
+    } else if (tagColor != null) {
+      // Tag has explicit color and no mention
+      res = res.merge(TextStyle(color: tagColor));
+    } else if (currencyColor != null) {
+      // Currency has explicit color and no mention/tag
+      res = res.merge(TextStyle(color: currencyColor));
+    } else if (!hasMention && !hasTag && !hasCurrency) {
+      // No mention, tag, or currency attribute, apply regular color if set
+      if (color != null && color.value != null) {
+        var textColor = defaultStyles.color;
+        if (color.value is String) {
+          textColor = stringToColor(color.value, null, defaultStyles);
+        }
+        if (textColor != null) {
+          res = res.merge(TextStyle(color: textColor));
+        }
+      }
+      // If no regular color attribute, default color will be used (from defaultStyles)
+    } else {
+      // Mention, tag, or currency exists but has no color - use default color
+      // This ensures text after tags/mentions/currency uses default color, not inherited color
+      // Default color is already set in res from defaultStyles, so no need to merge
     }
 
     final background = nodeStyle.attributes[Attribute.background.key];
