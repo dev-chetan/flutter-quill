@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../controller/quill_controller.dart';
@@ -10,31 +12,39 @@ class MentionTagState {
   MentionTagState({
     required this.config,
     required this.controller,
+    this.onVisibilityChanged,
   });
 
   final MentionTagConfig config;
   final QuillController controller;
-  OverlayEntry? overlayEntry;
+  final void Function(bool visible, String query, bool isMention, String tagTrigger)? onVisibilityChanged;
   MentionTagOverlay? overlayWidget;
+  final ValueKey _overlayKey = const ValueKey('mention_tag_overlay'); // Stable key to preserve widget state
   String currentQuery = '';
   bool isMention = false;
   int triggerPosition = -1;
   String tagTriggerChar = '#'; // Track which tag trigger was used (# or $)
+  int _itemCount = 0; // Track number of items in overlay
+  Timer? _searchDebounceTimer; // Debounce timer for search
+  String? _pendingQuery; // Query waiting to be applied after debounce
 
-  void showOverlay(BuildContext context, bool isMentionMode, int position, {String? tagTrigger}) {
-    if (overlayEntry != null) {
-      hideOverlay();
-    }
 
+  void showOverlay(bool isMentionMode, int position, String query,
+      {String? tagTrigger}) {
     isMention = isMentionMode;
     triggerPosition = position;
-    currentQuery = '';
+    currentQuery = query;
     if (tagTrigger != null) {
       tagTriggerChar = tagTrigger;
     }
 
+    // Cancel any pending debounce timer
+    _searchDebounceTimer?.cancel();
+
+    // Create widget immediately (no debounce for initial show)
     overlayWidget = MentionTagOverlay(
-      query: currentQuery,
+      key: _overlayKey, // Stable key preserves state across rebuilds
+      query: query,
       isMention: isMentionMode,
       tagTrigger: tagTriggerChar,
       onSelectMention: _handleMentionSelected,
@@ -44,53 +54,67 @@ class MentionTagState {
       dollarSearch: config.dollarSearch,
       maxHeight: config.maxHeight,
       itemHeight: config.itemHeight,
+      mentionItemBuilder: config.mentionItemBuilder,
+      tagItemBuilder: config.tagItemBuilder,
+      onItemCountChanged: (count) {
+        _itemCount = count;
+      },
     );
-
-    overlayEntry = OverlayEntry(
-      builder: (context) => _buildOverlay(context),
-    );
-
-    Overlay.of(context, rootOverlay: true).insert(overlayEntry!);
+    // Always notify visibility change to ensure wrapper rebuilds
+    onVisibilityChanged?.call(true, query, isMentionMode, tagTriggerChar);
   }
 
-  Widget _buildOverlay(BuildContext context) {
-    return Positioned(
-      bottom: MediaQuery.of(context).viewInsets.bottom + 8,
-      left: 16,
-      right: 16,
-      child: Material(
-        color: Colors.transparent,
-        child: overlayWidget!,
-      ),
-    );
-  }
 
   void updateQuery(String query) {
-    if (overlayWidget != null) {
-      currentQuery = query;
-      overlayWidget = MentionTagOverlay(
-        query: query,
-        isMention: isMention,
-        tagTrigger: tagTriggerChar,
-        onSelectMention: _handleMentionSelected,
-        onSelectTag: _handleTagSelected,
-        mentionSearch: config.mentionSearch,
-        tagSearch: config.tagSearch,
-        dollarSearch: config.dollarSearch,
-        maxHeight: config.maxHeight,
-        itemHeight: config.itemHeight,
-      );
-      overlayEntry?.markNeedsBuild();
-    }
+    // Update query without recreating widget
+    if (currentQuery == query) return;
+    
+    currentQuery = query;
+    
+    // Cancel any pending debounce timer
+    _searchDebounceTimer?.cancel();
+    
+    // Debounce widget update to avoid rapid rebuilds
+    final queryToUpdate = query;
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (currentQuery == queryToUpdate && overlayWidget != null) {
+        // Update the existing widget's query by recreating with same key
+        // The stable key ensures Flutter reuses the state and calls didUpdateWidget
+        overlayWidget = MentionTagOverlay(
+          key: _overlayKey, // Same stable key preserves state
+          query: queryToUpdate,
+          isMention: isMention,
+          tagTrigger: tagTriggerChar,
+          onSelectMention: _handleMentionSelected,
+          onSelectTag: _handleTagSelected,
+          mentionSearch: config.mentionSearch,
+          tagSearch: config.tagSearch,
+          dollarSearch: config.dollarSearch,
+          maxHeight: config.maxHeight,
+          itemHeight: config.itemHeight,
+          mentionItemBuilder: config.mentionItemBuilder,
+          tagItemBuilder: config.tagItemBuilder,
+          onItemCountChanged: (count) {
+            _itemCount = count;
+          },
+        );
+        // Notify visibility change to ensure wrapper rebuilds with updated widget
+        // Use a flag to indicate this is just an update, not a show/hide
+        onVisibilityChanged?.call(true, queryToUpdate, isMention, tagTriggerChar);
+      }
+    });
   }
 
   void hideOverlay() {
-    overlayEntry?.remove();
-    overlayEntry = null;
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = null;
+    _pendingQuery = null;
     overlayWidget = null;
     currentQuery = '';
     triggerPosition = -1;
     tagTriggerChar = '#';
+    _itemCount = 0;
+    onVisibilityChanged?.call(false, '', false, '#');
   }
 
   void _handleMentionSelected(MentionItem item) {
@@ -99,7 +123,7 @@ class MentionTagState {
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
     var actualPosition = triggerPosition;
-    
+
     // Search backwards from cursor to find @
     var searchPos = controller.selection.baseOffset - 1;
     while (searchPos >= 0 && searchPos < plainText.length) {
@@ -147,7 +171,7 @@ class MentionTagState {
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
     var actualPosition = triggerPosition;
-    
+
     // Search backwards from cursor to find # or $
     var searchPos = controller.selection.baseOffset - 1;
     String? triggerChar;
@@ -176,21 +200,24 @@ class MentionTagState {
       final numericValue = double.tryParse(item.name);
       if (numericValue != null) {
         // Format with commas for thousands
-        final formattedValue = numericValue.toStringAsFixed(numericValue.truncateToDouble() == numericValue ? 0 : 2);
+        final formattedValue = numericValue.toStringAsFixed(
+            numericValue.truncateToDouble() == numericValue ? 0 : 2);
         final parts = formattedValue.split('.');
         final integerPart = parts[0];
         final decimalPart = parts.length > 1 ? parts[1] : '';
-        
+
         // Add commas for thousands
         String formattedInteger = '';
         for (int i = integerPart.length - 1; i >= 0; i--) {
-          if ((integerPart.length - 1 - i) % 3 == 0 && i < integerPart.length - 1) {
+          if ((integerPart.length - 1 - i) % 3 == 0 &&
+              i < integerPart.length - 1) {
             formattedInteger = ',$formattedInteger';
           }
           formattedInteger = integerPart[i] + formattedInteger;
         }
-        
-        tagText = '\$$formattedInteger${decimalPart.isNotEmpty ? '.$decimalPart' : ''}';
+
+        tagText =
+            '\$$formattedInteger${decimalPart.isNotEmpty ? '.$decimalPart' : ''}';
       } else {
         // Not numeric, just use name as is
         tagText = '\$${item.name}';
@@ -199,7 +226,7 @@ class MentionTagState {
       // For # tags, use as is
       tagText = '$triggerChar${item.name}';
     }
-    
+
     controller.replaceText(
       actualPosition,
       deleteLength,
@@ -256,9 +283,8 @@ bool handleMentionTrigger(QuillController controller) {
   if (plainText.isEmpty || selection.baseOffset == 0) return false;
 
   // Check if @ was just typed
-  final charBefore = selection.baseOffset > 0
-      ? plainText[selection.baseOffset - 1]
-      : null;
+  final charBefore =
+      selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
 
   if (charBefore != '@') return false;
 
@@ -282,9 +308,8 @@ bool handleTagTrigger(QuillController controller) {
   if (plainText.isEmpty || selection.baseOffset == 0) return false;
 
   // Check if # was just typed
-  final charBefore = selection.baseOffset > 0
-      ? plainText[selection.baseOffset - 1]
-      : null;
+  final charBefore =
+      selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
 
   if (charBefore != '#') return false;
 
@@ -308,9 +333,8 @@ bool handleDollarTagTrigger(QuillController controller) {
   if (plainText.isEmpty || selection.baseOffset == 0) return false;
 
   // Check if $ was just typed
-  final charBefore = selection.baseOffset > 0
-      ? plainText[selection.baseOffset - 1]
-      : null;
+  final charBefore =
+      selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
 
   if (charBefore != '\$') return false;
 
@@ -326,15 +350,16 @@ bool handleDollarTagTrigger(QuillController controller) {
 }
 
 /// Extract query text after @, #, or $
-String extractQuery(QuillController controller, bool isMention, {String? tagTrigger}) {
+String extractQuery(QuillController controller, bool isMention,
+    {String? tagTrigger}) {
   final selection = controller.selection;
   final plainText = controller.document.toPlainText();
-  
+
   if (selection.baseOffset == 0) return '';
-  
+
   var startPos = selection.baseOffset - 1;
   final triggerChar = isMention ? '@' : (tagTrigger ?? '#');
-  
+
   // Find the trigger character
   while (startPos >= 0 && plainText[startPos] != triggerChar) {
     if (plainText[startPos] == ' ' || plainText[startPos] == '\n') {
@@ -342,11 +367,11 @@ String extractQuery(QuillController controller, bool isMention, {String? tagTrig
     }
     startPos--;
   }
-  
+
   if (startPos < 0 || plainText[startPos] != triggerChar) {
     return '';
   }
-  
+
   // Extract text after trigger
   final query = plainText.substring(startPos + 1, selection.baseOffset);
   return query;

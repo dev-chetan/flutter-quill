@@ -13,6 +13,8 @@ class MentionTagConfig {
     this.itemHeight = 48,
     this.onMentionSelected,
     this.onTagSelected,
+    this.mentionItemBuilder,
+    this.tagItemBuilder,
   });
 
   /// Callback to search for users when @ is typed
@@ -35,4 +37,12 @@ class MentionTagConfig {
 
   /// Optional callback when a tag is selected
   final void Function(TagItem)? onTagSelected;
+
+  /// Optional custom builder for mention items
+  /// If provided, this will be used instead of the default mention item widget
+  final MentionItemBuilder? mentionItemBuilder;
+
+  /// Optional custom builder for tag items
+  /// If provided, this will be used instead of the default tag item widget
+  final TagItemBuilder? tagItemBuilder;
 }
