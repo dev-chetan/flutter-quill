@@ -56,6 +56,10 @@ class MentionTagState {
       itemHeight: config.itemHeight,
       mentionItemBuilder: config.mentionItemBuilder,
       tagItemBuilder: config.tagItemBuilder,
+      customData: config.customData,
+      onLoadMoreMentions: config.onLoadMoreMentions,
+      onLoadMoreTags: config.onLoadMoreTags,
+      onLoadMoreDollarTags: config.onLoadMoreDollarTags,
       onItemCountChanged: (count) {
         _itemCount = count;
       },
@@ -94,6 +98,10 @@ class MentionTagState {
           itemHeight: config.itemHeight,
           mentionItemBuilder: config.mentionItemBuilder,
           tagItemBuilder: config.tagItemBuilder,
+          customData: config.customData,
+          onLoadMoreMentions: config.onLoadMoreMentions,
+          onLoadMoreTags: config.onLoadMoreTags,
+          onLoadMoreDollarTags: config.onLoadMoreDollarTags,
           onItemCountChanged: (count) {
             _itemCount = count;
           },
@@ -117,8 +125,44 @@ class MentionTagState {
     onVisibilityChanged?.call(false, '', false, '#');
   }
 
+  /// Refresh the suggestion list with current query
+  /// Call this when the underlying data has changed and you want to update the list
+  void refreshList() {
+    if (overlayWidget != null) {
+      // Recreate widget with same query but updated search callbacks
+      // This will trigger didUpdateWidget which will detect the callback change and refresh
+      // Works even with empty query (when showing all data)
+      overlayWidget = MentionTagOverlay(
+        key: _overlayKey,
+        query: currentQuery,
+        isMention: isMention,
+        tagTrigger: tagTriggerChar,
+        onSelectMention: _handleMentionSelected,
+        onSelectTag: _handleTagSelected,
+        mentionSearch: config.mentionSearch,
+        tagSearch: config.tagSearch,
+        dollarSearch: config.dollarSearch,
+        maxHeight: config.maxHeight,
+        itemHeight: config.itemHeight,
+        mentionItemBuilder: config.mentionItemBuilder,
+        tagItemBuilder: config.tagItemBuilder,
+        customData: config.customData,
+        onLoadMoreMentions: config.onLoadMoreMentions,
+        onLoadMoreTags: config.onLoadMoreTags,
+        onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+        onItemCountChanged: (count) {
+          _itemCount = count;
+        },
+      );
+      onVisibilityChanged?.call(true, currentQuery, isMention, tagTriggerChar);
+    }
+  }
+
   void _handleMentionSelected(MentionItem item) {
     if (triggerPosition == -1) return;
+
+    // Hide overlay first with smooth animation
+    hideOverlay();
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
@@ -140,33 +184,37 @@ class MentionTagState {
     // Calculate how much to delete
     final deleteLength = controller.selection.baseOffset - actualPosition;
 
-    // Insert mention text with attribute
-    final mentionText = '@${item.name}';
-    controller.replaceText(
-      actualPosition,
-      deleteLength,
-      mentionText,
-      TextSelection.collapsed(offset: actualPosition + mentionText.length),
-    );
+    // Insert mention text with attribute after a small delay to allow animation
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final mentionText = '@${item.name}';
+      controller.replaceText(
+        actualPosition,
+        deleteLength,
+        mentionText,
+        TextSelection.collapsed(offset: actualPosition + mentionText.length),
+      );
 
-    // Apply mention attribute
-    controller.formatText(
-      actualPosition,
-      mentionText.length,
-      MentionAttribute(value: {
-        'id': item.id,
-        'name': item.name,
-        if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-        if (item.color != null) 'color': item.color,
-      }),
-    );
+      // Apply mention attribute
+      controller.formatText(
+        actualPosition,
+        mentionText.length,
+        MentionAttribute(value: {
+          'id': item.id,
+          'name': item.name,
+          if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
+          if (item.color != null) 'color': item.color,
+        }),
+      );
 
-    config.onMentionSelected?.call(item);
-    hideOverlay();
+      config.onMentionSelected?.call(item);
+    });
   }
 
   void _handleTagSelected(TagItem item) {
     if (triggerPosition == -1) return;
+
+    // Hide overlay first with smooth animation
+    hideOverlay();
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
@@ -227,40 +275,42 @@ class MentionTagState {
       tagText = '$triggerChar${item.name}';
     }
 
-    controller.replaceText(
-      actualPosition,
-      deleteLength,
-      tagText,
-      TextSelection.collapsed(offset: actualPosition + tagText.length),
-    );
-
-    // Apply tag attribute - use CurrencyAttribute for $ tags, TagAttribute for # tags
-    if (triggerChar == '\$') {
-      controller.formatText(
+    // Insert tag text with attribute after a small delay to allow animation
+    Future.delayed(const Duration(milliseconds: 100), () {
+      controller.replaceText(
         actualPosition,
-        tagText.length,
-        CurrencyAttribute(value: {
-          'id': item.id,
-          'name': item.name,
-          if (item.count != null) 'count': item.count,
-          if (item.color != null) 'color': item.color,
-        }),
+        deleteLength,
+        tagText,
+        TextSelection.collapsed(offset: actualPosition + tagText.length),
       );
-    } else {
-      controller.formatText(
-        actualPosition,
-        tagText.length,
-        TagAttribute(value: {
-          'id': item.id,
-          'name': item.name,
-          if (item.count != null) 'count': item.count,
-          if (item.color != null) 'color': item.color,
-        }),
-      );
-    }
 
-    config.onTagSelected?.call(item);
-    hideOverlay();
+      // Apply tag attribute - use CurrencyAttribute for $ tags, TagAttribute for # tags
+      if (triggerChar == '\$') {
+        controller.formatText(
+          actualPosition,
+          tagText.length,
+          CurrencyAttribute(value: {
+            'id': item.id,
+            'name': item.name,
+            if (item.count != null) 'count': item.count,
+            if (item.color != null) 'color': item.color,
+          }),
+        );
+      } else {
+        controller.formatText(
+          actualPosition,
+          tagText.length,
+          TagAttribute(value: {
+            'id': item.id,
+            'name': item.name,
+            if (item.count != null) 'count': item.count,
+            if (item.color != null) 'color': item.color,
+          }),
+        );
+      }
+
+      config.onTagSelected?.call(item);
+    });
   }
 
   bool handleKeyEvent(KeyEvent event) {

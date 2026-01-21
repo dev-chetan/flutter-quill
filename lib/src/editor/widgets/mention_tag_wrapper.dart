@@ -8,6 +8,7 @@ import '../../document/document.dart';
 import '../../document/structs/doc_change.dart';
 import '../config/events/mention_tag_handlers.dart';
 import '../config/mention_tag_config.dart';
+import '../config/mention_tag_controller.dart';
 
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
@@ -15,12 +16,17 @@ class MentionTagWrapper extends StatefulWidget {
     required this.controller,
     required this.child,
     required this.config,
+    this.mentionTagController,
     super.key,
   });
 
   final QuillController controller;
   final Widget child;
   final MentionTagConfig config;
+  
+  /// Optional controller to refresh the suggestion list
+  /// If provided, you can call [MentionTagController.refresh] to update the list
+  final MentionTagController? mentionTagController;
 
   @override
   State<MentionTagWrapper> createState() => _MentionTagWrapperState();
@@ -62,6 +68,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         });
       },
     );
+
+    // Set up the refresh callback if controller is provided
+    widget.mentionTagController?.setRefreshCallback(() {
+      refreshSuggestionList();
+    });
 
     // Listen to document changes to detect @, #, and $ triggers
     _changeSubscription = widget.controller.document.changes.listen((change) {
@@ -247,6 +258,12 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     _mentionTagState?.hideOverlay();
   }
 
+  /// Refresh the suggestion list when data changes
+  /// Call this method when your data source has been updated
+  void refreshSuggestionList() {
+    _mentionTagState?.refreshList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final overlayWidget = _mentionTagState?.overlayWidget;
@@ -261,9 +278,27 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         child: Column(children: [
           // Editor widget - takes available space
           Expanded(child: widget.child),
-          // Show suggestion list below editor when visible
-          // Show widget if overlay is visible (widget handles empty/loading states internally)
-          if (_isOverlayVisible && overlayWidget != null) overlayWidget
+          // Show suggestion list below editor when visible with smooth animation
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1.0,
+                  child: child,
+                ),
+              );
+            },
+            child: (_isOverlayVisible && overlayWidget != null)
+                ? Padding(
+                    key: const ValueKey('suggestion_view'),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: overlayWidget,
+                  )
+                : const SizedBox.shrink(key: ValueKey('empty')),
+          ),
         ]));
   }
 }

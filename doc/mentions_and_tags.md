@@ -62,6 +62,10 @@ Optional parameters:
 - `itemHeight`: Height of each item in the list (default: 48)
 - `onMentionSelected`: Callback when a mention is selected
 - `onTagSelected`: Callback when a tag is selected
+- `mentionItemBuilder`: Custom builder for mention items (allows full UI customization)
+- `tagItemBuilder`: Custom builder for tag items (allows full UI customization)
+- `customData`: Custom data passed to builders (for additional context)
+- `dollarSearch`: Callback to search for currency tags when $ is typed
 
 ## Data Models
 
@@ -73,6 +77,7 @@ class MentionItem {
   final String name;
   final String? avatarUrl; // Optional avatar URL
   final String? color; // Optional color as hex string (e.g., "#FF5733") or color name
+  final dynamic customData; // Optional custom data for your requirements
 }
 ```
 
@@ -83,6 +88,8 @@ class TagItem {
   final String id;
   final String name;
   final int? count; // Optional tag count
+  final String? color; // Optional color
+  final dynamic customData; // Optional custom data for your requirements
 }
 ```
 
@@ -233,11 +240,129 @@ The overlay supports keyboard navigation:
 
 ## Customization
 
-You can customize the appearance by modifying the `MentionTagOverlay` widget or by providing custom builders in the future.
+### Custom Item Builders
+
+You can provide custom builders to fully customize the appearance of mention and tag items:
+
+```dart
+MentionTagConfig(
+  // ... other config ...
+  mentionItemBuilder: (context, item, isSelected, onTap, customData) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: item.avatarUrl != null 
+          ? NetworkImage(item.avatarUrl!) 
+          : null,
+        child: item.avatarUrl == null 
+          ? Text(item.name[0].toUpperCase()) 
+          : null,
+      ),
+      title: Text(item.name),
+      selected: isSelected,
+      onTap: onTap,
+      tileColor: isSelected ? Colors.blue.shade100 : null,
+    );
+  },
+  tagItemBuilder: (context, item, isSelected, onTap, customData) {
+    return ListTile(
+      leading: Icon(Icons.tag, color: Colors.blue),
+      title: Text('#${item.name}'),
+      trailing: item.count != null 
+        ? Text('${item.count}', style: TextStyle(color: Colors.grey))
+        : null,
+      selected: isSelected,
+      onTap: onTap,
+    );
+  },
+  customData: {'theme': 'dark', 'userId': '123'}, // Pass any custom data
+)
+```
+
+### Custom Data
+
+You can pass custom data to builders using the `customData` parameter:
+
+```dart
+MentionTagConfig(
+  customData: {
+    'currentUserId': '123',
+    'theme': 'dark',
+    'permissions': ['edit', 'delete'],
+    // Any data you need
+  },
+  mentionItemBuilder: (context, item, isSelected, onTap, customData) {
+    final userId = customData?['currentUserId'];
+    final isCurrentUser = item.id == userId;
+    
+    return ListTile(
+      title: Text(item.name),
+      trailing: isCurrentUser ? Text('You') : null,
+      // ... rest of your custom UI
+    );
+  },
+)
+```
+
+### Refreshing the List
+
+When your data changes, you can refresh the suggestion list:
+
+**Option 1: Using GlobalKey (Recommended)**
+
+```dart
+class _MyEditorState extends State<MyEditor> {
+  final GlobalKey<_MentionTagWrapperState> _mentionTagKey = GlobalKey();
+  
+  void _updateData() {
+    // Your data update logic
+    setState(() {
+      _users.add(MentionItem(id: '4', name: 'New User'));
+    });
+    
+    // Refresh the suggestion list
+    _mentionTagKey.currentState?.refreshSuggestionList();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return MentionTagWrapper(
+      key: _mentionTagKey,
+      // ... rest of config
+    );
+  }
+}
+```
+
+**Option 2: Update Search Callbacks**
+
+The list will automatically refresh when search callbacks change:
+
+```dart
+setState(() {
+  _config = MentionTagConfig(
+    mentionSearch: (query) async {
+      // Return updated data
+      return updatedMentionList;
+    },
+    // ... other callbacks
+  );
+});
+```
+
+## Features
+
+- **Smooth Animations**: List items animate smoothly when data changes
+- **Smooth Closing**: The suggestion view closes with a smooth fade and size animation when an item is selected
+- **Incremental Updates**: Only changed items are updated, preserving existing items
+- **Keyboard Navigation**: Full keyboard support with arrow keys and Enter
+- **Debounced Search**: Prevents excessive API calls during typing
+- **Empty Query Support**: Shows all data immediately when trigger character is typed (#, @, or $)
 
 ## Notes
 
-- The overlay appears above the keyboard automatically
+- The suggestion list appears below the editor (not as an overlay)
 - The search is debounced to avoid excessive API calls
 - Mentions and tags are stored as inline attributes in the document
 - The feature works on all platforms (iOS, Android, Web, Desktop)
+- The list automatically updates when search callbacks change
+- Custom builders receive `customData` for additional context

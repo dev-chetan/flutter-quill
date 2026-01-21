@@ -11,12 +11,14 @@ class MentionItem {
   final String name;
   final String? avatarUrl;
   final String? color; // Color as hex string (e.g., "#FF5733") or color name
+  final dynamic customData; // Custom data for additional requirements
 
   const MentionItem({
     required this.id,
     required this.name,
     this.avatarUrl,
     this.color,
+    this.customData,
   });
 }
 
@@ -26,12 +28,14 @@ class TagItem {
   final String name;
   final int? count;
   final String? color; // Color as hex string (e.g., "#FF5733") or color name
+  final dynamic customData; // Custom data for additional requirements
 
   const TagItem({
     required this.id,
     required this.name,
     this.count,
     this.color,
+    this.customData,
   });
 }
 
@@ -43,19 +47,23 @@ typedef MentionSearchCallback = Future<List<MentionItem>> Function(
 typedef TagSearchCallback = Future<List<TagItem>> Function(String query);
 
 /// Builder for custom mention item widget
+/// [customData] can be null if not needed
 typedef MentionItemBuilder = Widget Function(
   BuildContext context,
   MentionItem item,
   bool isSelected,
   VoidCallback onTap,
+  dynamic customData,
 );
 
 /// Builder for custom tag item widget
+/// [customData] can be null if not needed
 typedef TagItemBuilder = Widget Function(
   BuildContext context,
   TagItem item,
   bool isSelected,
   VoidCallback onTap,
+  dynamic customData,
 );
 
 /// Overlay widget that shows mention/tag list above keyboard
@@ -74,6 +82,10 @@ class MentionTagOverlay extends StatefulWidget {
     this.onItemCountChanged,
     this.mentionItemBuilder,
     this.tagItemBuilder,
+    this.customData,
+    this.onLoadMoreMentions,
+    this.onLoadMoreTags,
+    this.onLoadMoreDollarTags,
     super.key,
   });
 
@@ -92,6 +104,10 @@ class MentionTagOverlay extends StatefulWidget {
   final MentionItemBuilder?
       mentionItemBuilder; // Custom builder for mention items
   final TagItemBuilder? tagItemBuilder; // Custom builder for tag items
+  final dynamic customData; // Custom data passed to builders
+  final Future<List<MentionItem>> Function(String query, List<MentionItem> currentItems, int currentPage)? onLoadMoreMentions;
+  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreTags;
+  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreDollarTags;
 
   @override
   State<MentionTagOverlay> createState() => _MentionTagOverlayState();
@@ -101,16 +117,21 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   List<MentionItem> _mentions = [];
   List<TagItem> _tags = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false; // Track if loading more items
+  bool _hasMoreItems = true; // Track if there are more items to load
+  int _currentPage = 0; // Track current page for pagination
   int _selectedIndex = 0;
   Timer? _searchDebounceTimer;
   Timer? _loadingIndicatorTimer; // Timer to delay showing loading indicator
   String _lastSearchedQuery = '';
   int _listVersion = 0; // Track list changes for animation
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _lastSearchedQuery = widget.query;
+    _scrollController.addListener(_onScroll);
     _searchWithQuery(widget.query);
   }
 
@@ -118,12 +139,133 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   void dispose() {
     _searchDebounceTimer?.cancel();
     _loadingIndicatorTimer?.cancel();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    // Check if user scrolled near the bottom (within 100px)
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 100) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    // Don't load more if already loading, no more items, or no callback provided
+    if (_isLoadingMore || !_hasMoreItems) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      if (widget.isMention) {
+        // Handle mentions
+        if (widget.onLoadMoreMentions == null) {
+          if (mounted) {
+            setState(() {
+              _isLoadingMore = false;
+              _hasMoreItems = false;
+            });
+          }
+          return;
+        }
+
+        final newItems = await widget.onLoadMoreMentions!(
+            widget.query, _mentions, _currentPage + 1);
+
+        if (mounted) {
+          setState(() {
+            if (newItems.isEmpty) {
+              _hasMoreItems = false;
+            } else {
+              // Append new items, avoiding duplicates
+              final existingIds = _mentions.map((e) => e.id).toSet();
+              final uniqueNewItems = newItems
+                  .where((item) => !existingIds.contains(item.id))
+                  .toList();
+              _mentions.addAll(uniqueNewItems);
+              _currentPage++;
+              // If we got fewer items than requested, assume no more items
+              _hasMoreItems = uniqueNewItems.isNotEmpty;
+            }
+            _isLoadingMore = false;
+            _listVersion++; // Trigger animation
+          });
+
+          widget.onItemCountChanged?.call(_mentions.length);
+        }
+      } else {
+        // Handle tags
+        final loadMoreCallback = widget.tagTrigger == '\$'
+            ? widget.onLoadMoreDollarTags
+            : widget.onLoadMoreTags;
+
+        if (loadMoreCallback == null) {
+          if (mounted) {
+            setState(() {
+              _isLoadingMore = false;
+              _hasMoreItems = false;
+            });
+          }
+          return;
+        }
+
+        final newItems = await loadMoreCallback(
+            widget.query, _tags, _currentPage + 1);
+
+        if (mounted) {
+          setState(() {
+            if (newItems.isEmpty) {
+              _hasMoreItems = false;
+            } else {
+              // Append new items, avoiding duplicates
+              final existingIds = _tags.map((e) => e.id).toSet();
+              final uniqueNewItems = newItems
+                  .where((item) => !existingIds.contains(item.id))
+                  .toList();
+              _tags.addAll(uniqueNewItems);
+              _currentPage++;
+              // If we got fewer items than requested, assume no more items
+              _hasMoreItems = uniqueNewItems.isNotEmpty;
+            }
+            _isLoadingMore = false;
+            _listVersion++; // Trigger animation
+          });
+
+          widget.onItemCountChanged?.call(_tags.length);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+          _hasMoreItems = false; // Stop trying if error occurs
+        });
+      }
+    }
   }
 
   @override
   void didUpdateWidget(MentionTagOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Check if search callbacks changed (data source updated)
+    final searchCallbacksChanged = widget.isMention
+        ? (oldWidget.mentionSearch != widget.mentionSearch)
+        : (widget.tagTrigger == '\$'
+            ? (oldWidget.dollarSearch != widget.dollarSearch)
+            : (oldWidget.tagSearch != widget.tagSearch));
+    
+    // If search callbacks changed, refresh the list immediately
+    if (searchCallbacksChanged) {
+      _lastSearchedQuery = ''; // Reset to force refresh
+      _searchDebounceTimer?.cancel();
+      _searchWithQuery(widget.query);
+      return;
+    }
+    
     // Only search if query actually changed and we haven't already searched for this query
     if (oldWidget.query != widget.query && widget.query != _lastSearchedQuery) {
       _selectedIndex = 0;
@@ -142,17 +284,22 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     }
   }
 
+  /// Refresh the list by re-searching with the current query
+  /// This is useful when the underlying data source has changed
+  /// Call this method to force an update even if the query hasn't changed
+  void refresh() {
+    _lastSearchedQuery = ''; // Reset to force refresh
+    _searchDebounceTimer?.cancel();
+    _searchWithQuery(widget.query);
+  }
+
   Future<void> _searchWithQuery(String query) async {
-    if (query.isEmpty) {
-      _loadingIndicatorTimer?.cancel();
-      setState(() {
-        _mentions = [];
-        _tags = [];
-        _isLoading = false;
-      });
-      widget.onItemCountChanged?.call(0);
-      return;
-    }
+    // Allow empty query to show all results when trigger is first typed
+    // This enables showing all data immediately when user types #, @, or $
+
+    // Reset pagination state when searching
+    _currentPage = 0;
+    _hasMoreItems = true;
 
     // Cancel any existing loading indicator timer
     _loadingIndicatorTimer?.cancel();
@@ -174,6 +321,12 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         _loadingIndicatorTimer?.cancel();
         if (mounted) {
           _updateMentionsList(results);
+          // Check if we should enable load more based on results
+          if (widget.onLoadMoreMentions != null && results.isNotEmpty) {
+            _hasMoreItems = true; // Assume there might be more
+          } else {
+            _hasMoreItems = false;
+          }
         }
       } else {
         // Use dollarSearch for $ tags, tagSearch for # tags
@@ -184,6 +337,15 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         _loadingIndicatorTimer?.cancel();
         if (mounted) {
           _updateTagsList(results);
+          // Check if we should enable load more based on results
+          final loadMoreCallback = widget.tagTrigger == '\$'
+              ? widget.onLoadMoreDollarTags
+              : widget.onLoadMoreTags;
+          if (loadMoreCallback != null && results.isNotEmpty) {
+            _hasMoreItems = true; // Assume there might be more
+          } else {
+            _hasMoreItems = false;
+          }
         }
       }
     } catch (e) {
@@ -191,6 +353,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasMoreItems = false;
         });
       }
     }
@@ -349,60 +512,119 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     final isEmpty =
         (widget.isMention ? _mentions.isEmpty : _tags.isEmpty) && !_isLoading;
 
-    // Hide only if query is empty, no items, and not loading
-    // This allows showing loading state even when query is initially empty
-    if (isEmpty && widget.query.isEmpty && !_isLoading) {
+    // Show loading indicator when searching
+    // if (_isLoading) {
+    //   return Container(
+    //     height: widget.maxHeight,
+    //     decoration: BoxDecoration(
+    //       color: Theme.of(context).cardColor,
+    //       borderRadius: BorderRadius.circular(8),
+    //       border: Border.all(
+    //         color: Theme.of(context).dividerColor,
+    //       ),
+    //     ),
+    //     child: const Center(
+    //       child: Padding(
+    //         padding: EdgeInsets.all(16.0),
+    //         child: CircularProgressIndicator(),
+    //       ),
+    //     ),
+    //   );
+    // }
+
+    // Hide only if no items and query is empty (no trigger typed)
+    if (isEmpty && widget.query.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return /*_isLoading
-        ? const Center(
-            child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: CircularProgressIndicator()))
-        : */
-        isEmpty
-            ? Container()
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                  child: widget.isMention
-                      ? ListView.builder(
-                          key: ValueKey('mentions_list_v$_listVersion'),
-                          itemCount: _mentions.length,
-                          shrinkWrap: true,
-                          itemExtent: widget.itemHeight,
-                          itemBuilder: (context, index) {
-                            final isSelected = index == _selectedIndex;
-                            return _buildAnimatedItem(
-                              context,
-                              index,
-                              isSelected,
-                              key: ValueKey(_mentions[index].id),
-                            );
-                          },
-                        )
-                      : ListView.builder(
-                          key: ValueKey('tags_list_v$_listVersion'),
-                          itemCount: _tags.length,
-                          shrinkWrap: true,
-                          itemExtent: widget.itemHeight,
-                          itemBuilder: (context, index) {
-                            final isSelected = index == _selectedIndex;
-                            return _buildAnimatedItem(
-                              context,
-                              index,
-                              isSelected,
-                              key: ValueKey(_tags[index].id),
-                            );
-                          },
+    // Show empty state message if no results found
+    // if (isEmpty) {
+    //   return Container(
+    //     height: widget.maxHeight,
+    //     decoration: BoxDecoration(
+    //       color: Theme.of(context).cardColor,
+    //       borderRadius: BorderRadius.circular(8),
+    //       border: Border.all(
+    //         color: Theme.of(context).dividerColor,
+    //       ),
+    //     ),
+    //     child: Padding(
+    //       padding: const EdgeInsets.all(16.0),
+    //       child: Center(
+    //         child: Text(
+    //           widget.isMention ? 'No users found' : 'No tags found',
+    //           style: Theme.of(context).textTheme.bodyMedium,
+    //         ),
+    //       ),
+    //     ),
+    //   );
+    // }
+
+    return ClipRRect(
+      //borderRadius: BorderRadius.circular(8),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 100),
+        transitionBuilder: (child, animation) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        child: widget.isMention
+            ? ListView.builder(
+                key: ValueKey('mentions_list_v$_listVersion'),
+                controller: _scrollController,
+                itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
+                shrinkWrap: true,
+                itemExtent: widget.itemHeight,
+                itemBuilder: (context, index) {
+                  // Show loading indicator at the bottom
+                  if (index == _mentions.length) {
+                    return SizedBox(
+                      height: widget.itemHeight,
+                      child: const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                ),
-              );
+                      ),
+                    );
+                  }
+                  final isSelected = index == _selectedIndex;
+                  return _buildAnimatedItem(
+                    context,
+                    index,
+                    isSelected,
+                    key: ValueKey(_mentions[index].id),
+                  );
+                })
+            : ListView.builder(
+                key: ValueKey('tags_list_v$_listVersion'),
+                controller: _scrollController,
+                itemCount: _tags.length + (_isLoadingMore ? 1 : 0),
+                shrinkWrap: true,
+                itemExtent: widget.itemHeight,
+                itemBuilder: (context, index) {
+                  // Show loading indicator at the bottom
+                  if (index == _tags.length) {
+                    return SizedBox(
+                      height: widget.itemHeight,
+                      child: const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  }
+                  final isSelected = index == _selectedIndex;
+                  return _buildAnimatedItem(
+                    context,
+                    index,
+                    isSelected,
+                    key: ValueKey(_tags[index].id),
+                  );
+                },
+              ),
+      ),
+    );
   }
 
   Widget _buildAnimatedItem(BuildContext context, int index, bool isSelected,
@@ -435,6 +657,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
             });
             _selectItem();
           },
+          widget.customData,
         );
       }
 
@@ -512,6 +735,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
             });
             _selectItem();
           },
+          widget.customData,
         );
       }
 

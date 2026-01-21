@@ -15,6 +15,10 @@ class MentionTagConfig {
     this.onTagSelected,
     this.mentionItemBuilder,
     this.tagItemBuilder,
+    this.customData,
+    this.onLoadMoreMentions,
+    this.onLoadMoreTags,
+    this.onLoadMoreDollarTags,
   });
 
   /// Callback to search for users when @ is typed
@@ -45,4 +49,23 @@ class MentionTagConfig {
   /// Optional custom builder for tag items
   /// If provided, this will be used instead of the default tag item widget
   final TagItemBuilder? tagItemBuilder;
+
+  /// Optional custom data that can be passed to builders
+  /// This allows users to pass additional context or data for their custom requirements
+  final dynamic customData;
+
+  /// Optional callback to load more mentions when user scrolls to bottom
+  /// Parameters: (query, currentItems, currentPage)
+  /// Should return a list of new items to append, or empty list if no more items
+  final Future<List<MentionItem>> Function(String query, List<MentionItem> currentItems, int currentPage)? onLoadMoreMentions;
+
+  /// Optional callback to load more tags when user scrolls to bottom
+  /// Parameters: (query, currentItems, currentPage)
+  /// Should return a list of new items to append, or empty list if no more items
+  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreTags;
+
+  /// Optional callback to load more dollar tags when user scrolls to bottom
+  /// Parameters: (query, currentItems, currentPage)
+  /// Should return a list of new items to append, or empty list if no more items
+  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreDollarTags;
 }

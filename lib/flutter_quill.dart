@@ -42,5 +42,6 @@ export 'src/toolbar/theme/quill_dialog_theme.dart';
 export 'src/toolbar/theme/quill_icon_theme.dart';
 
 export 'src/editor/config/mention_tag_config.dart';
+export 'src/editor/config/mention_tag_controller.dart';
 export 'src/editor/widgets/mention_tag_overlay.dart';
 export 'src/editor/widgets/mention_tag_wrapper.dart';
