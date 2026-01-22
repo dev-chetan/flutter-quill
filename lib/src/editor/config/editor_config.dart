@@ -36,6 +36,7 @@ class QuillEditorConfig {
     this.autoFocus = false,
     this.expands = false,
     this.placeholder,
+    this.placeholderTextStyle,
     this.checkBoxReadOnly,
     this.disableClipboard = false,
     this.textSelectionThemeData,
@@ -95,6 +96,10 @@ class QuillEditorConfig {
 
   /// The text placeholder in the quill editor
   final String? placeholder;
+
+  /// Custom text style for the placeholder text
+  /// If not provided, uses the default placeholder style from [DefaultStyles]
+  final TextStyle? placeholderTextStyle;
 
   /// Contains all the events that will be handled when
   /// the exact characters satifies the condition. This mean
@@ -482,6 +487,7 @@ class QuillEditorConfig {
   QuillEditorConfig copyWith({
     LeadingBlockNodeBuilder? customLeadingBlockBuilder,
     String? placeholder,
+    TextStyle? placeholderTextStyle,
     List<CharacterShortcutEvent>? characterShortcutEvents,
     List<SpaceShortcutEvent>? spaceShortcutEvents,
     bool? checkBoxReadOnly,
@@ -541,6 +547,7 @@ class QuillEditorConfig {
       customLeadingBlockBuilder:
           customLeadingBlockBuilder ?? this.customLeadingBlockBuilder,
       placeholder: placeholder ?? this.placeholder,
+      placeholderTextStyle: placeholderTextStyle ?? this.placeholderTextStyle,
       characterShortcutEvents:
           characterShortcutEvents ?? this.characterShortcutEvents,
       spaceShortcutEvents: spaceShortcutEvents ?? this.spaceShortcutEvents,

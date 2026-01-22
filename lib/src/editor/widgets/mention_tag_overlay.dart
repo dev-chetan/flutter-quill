@@ -6,12 +6,7 @@ import 'package:flutter/services.dart';
 import '../../common/utils/color.dart';
 
 /// Represents a user mention item
-class MentionItem {
-  final String id;
-  final String name;
-  final String? avatarUrl;
-  final String? color; // Color as hex string (e.g., "#FF5733") or color name
-  final dynamic customData; // Custom data for additional requirements
+class MentionItem { // Custom data for additional requirements
 
   const MentionItem({
     required this.id,
@@ -20,15 +15,15 @@ class MentionItem {
     this.color,
     this.customData,
   });
+  final String id;
+  final String name;
+  final String? avatarUrl;
+  final String? color; // Color as hex string (e.g., "#FF5733") or color name
+  final dynamic customData;
 }
 
 /// Represents a hashtag item
-class TagItem {
-  final String id;
-  final String name;
-  final int? count;
-  final String? color; // Color as hex string (e.g., "#FF5733") or color name
-  final dynamic customData; // Custom data for additional requirements
+class TagItem { // Custom data for additional requirements
 
   const TagItem({
     required this.id,
@@ -37,6 +32,11 @@ class TagItem {
     this.color,
     this.customData,
   });
+  final String id;
+  final String name;
+  final int? count;
+  final String? color; // Color as hex string (e.g., "#FF5733") or color name
+  final dynamic customData;
 }
 
 /// Callback for fetching users based on query
@@ -77,7 +77,6 @@ class MentionTagOverlay extends StatefulWidget {
     required this.tagSearch,
     required this.dollarSearch,
     this.maxHeight = 200,
-    this.itemHeight = 48,
     this.tagTrigger = '#',
     this.onItemCountChanged,
     this.mentionItemBuilder,
@@ -86,6 +85,7 @@ class MentionTagOverlay extends StatefulWidget {
     this.onLoadMoreMentions,
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
+    this.decoration,
     super.key,
   });
 
@@ -97,7 +97,6 @@ class MentionTagOverlay extends StatefulWidget {
   final TagSearchCallback tagSearch;
   final TagSearchCallback dollarSearch;
   final double maxHeight;
-  final double itemHeight;
   final String tagTrigger; // Tag trigger character (# or $)
   final void Function(int)?
       onItemCountChanged; // Callback when item count changes
@@ -105,9 +104,16 @@ class MentionTagOverlay extends StatefulWidget {
       mentionItemBuilder; // Custom builder for mention items
   final TagItemBuilder? tagItemBuilder; // Custom builder for tag items
   final dynamic customData; // Custom data passed to builders
-  final Future<List<MentionItem>> Function(String query, List<MentionItem> currentItems, int currentPage)? onLoadMoreMentions;
-  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreTags;
-  final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreDollarTags;
+  final Future<List<MentionItem>> Function(
+          String query, List<MentionItem> currentItems, int currentPage)?
+      onLoadMoreMentions;
+  final Future<List<TagItem>> Function(
+          String query, List<TagItem> currentItems, int currentPage)?
+      onLoadMoreTags;
+  final Future<List<TagItem>> Function(
+          String query, List<TagItem> currentItems, int currentPage)?
+      onLoadMoreDollarTags;
+  final BoxDecoration? decoration; // Custom decoration for the suggestion view
 
   @override
   State<MentionTagOverlay> createState() => _MentionTagOverlayState();
@@ -139,8 +145,8 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   void dispose() {
     _searchDebounceTimer?.cancel();
     _loadingIndicatorTimer?.cancel();
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _scrollController..removeListener(_onScroll)
+    ..dispose();
     super.dispose();
   }
 
@@ -213,8 +219,8 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           return;
         }
 
-        final newItems = await loadMoreCallback(
-            widget.query, _tags, _currentPage + 1);
+        final newItems =
+            await loadMoreCallback(widget.query, _tags, _currentPage + 1);
 
         if (mounted) {
           setState(() {
@@ -257,7 +263,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         : (widget.tagTrigger == '\$'
             ? (oldWidget.dollarSearch != widget.dollarSearch)
             : (oldWidget.tagSearch != widget.tagSearch));
-    
+
     // If search callbacks changed, refresh the list immediately
     if (searchCallbacksChanged) {
       _lastSearchedQuery = ''; // Reset to force refresh
@@ -265,7 +271,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       _searchWithQuery(widget.query);
       return;
     }
-    
+
     // Only search if query actually changed and we haven't already searched for this query
     if (oldWidget.query != widget.query && widget.query != _lastSearchedQuery) {
       _selectedIndex = 0;
@@ -365,7 +371,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     _loadingIndicatorTimer?.cancel();
 
     // Create maps for quick lookup
-    final oldMap = {for (var item in _mentions) item.id: item};
+    final oldMap = {for (final item in _mentions) item.id: item};
     final newIds = newResults.map((e) => e.id).toSet();
 
     // Find items that need to be removed (in old but not in new)
@@ -379,8 +385,8 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     // Only update if there are actual changes
     if (toRemove.isEmpty && toAdd.isEmpty) {
       // Check if any existing items need updates
-      bool needsUpdate = false;
-      for (var newItem in newResults) {
+      var needsUpdate = false;
+      for (final newItem in newResults) {
         final oldItem = oldMap[newItem.id];
         if (oldItem != null && oldItem != newItem) {
           needsUpdate = true;
@@ -560,69 +566,75 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     //   );
     // }
 
+    // Default decoration if none provided
+    final defaultDecoration = BoxDecoration(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: Theme.of(context).dividerColor,
+      ),
+    );
+    final decoration = widget.decoration ?? defaultDecoration;
+
     return ClipRRect(
-      //borderRadius: BorderRadius.circular(8),
+      borderRadius: decoration.borderRadius ?? BorderRadius.zero,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 100),
         transitionBuilder: (child, animation) {
           return FadeTransition(opacity: animation, child: child);
         },
-        child: widget.isMention
-            ? ListView.builder(
-                key: ValueKey('mentions_list_v$_listVersion'),
-                controller: _scrollController,
-                itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
-                shrinkWrap: true,
-                itemExtent: widget.itemHeight,
-                itemBuilder: (context, index) {
-                  // Show loading indicator at the bottom
-                  if (index == _mentions.length) {
-                    return SizedBox(
-                      height: widget.itemHeight,
-                      child: const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  }
-                  final isSelected = index == _selectedIndex;
-                  return _buildAnimatedItem(
-                    context,
-                    index,
-                    isSelected,
-                    key: ValueKey(_mentions[index].id),
-                  );
-                })
-            : ListView.builder(
-                key: ValueKey('tags_list_v$_listVersion'),
-                controller: _scrollController,
-                itemCount: _tags.length + (_isLoadingMore ? 1 : 0),
-                shrinkWrap: true,
-                itemExtent: widget.itemHeight,
-                itemBuilder: (context, index) {
-                  // Show loading indicator at the bottom
-                  if (index == _tags.length) {
-                    return SizedBox(
-                      height: widget.itemHeight,
-                      child: const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  }
-                  final isSelected = index == _selectedIndex;
-                  return _buildAnimatedItem(
-                    context,
-                    index,
-                    isSelected,
-                    key: ValueKey(_tags[index].id),
-                  );
-                },
-              ),
+        child: Container(
+          decoration: decoration,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            child: widget.isMention
+                ? ListView.builder(
+                    key: ValueKey('mentions_list_v$_listVersion'),
+                    controller: _scrollController,
+                    itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      // Show loading indicator at the bottom
+                      if (index == _mentions.length) {
+                        return const SizedBox(
+                            child: Center(
+                                child: Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))));
+                      }
+                      final isSelected = index == _selectedIndex;
+                      return _buildAnimatedItem(
+                        context,
+                        index,
+                        isSelected,
+                        key: ValueKey(_mentions[index].id),
+                      );
+                    })
+                : ListView.builder(
+                    key: ValueKey('tags_list_v$_listVersion'),
+                    controller: _scrollController,
+                    itemCount: _tags.length + (_isLoadingMore ? 1 : 0),
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      // Show loading indicator at the bottom
+                      if (index == _tags.length) {
+                        return const Center(
+                            child: Padding(
+                                padding: EdgeInsets.all(8),
+                                child: CircularProgressIndicator(strokeWidth: 2)));
+                      }
+                      final isSelected = index == _selectedIndex;
+                      return _buildAnimatedItem(
+                        context,
+                        index,
+                        isSelected,
+                        key: ValueKey(_tags[index].id),
+                      );
+                    },
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -674,19 +686,19 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           color: isSelected
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
               : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          //  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               if (mention.avatarUrl != null)
                 CircleAvatar(
-                  radius: 16.0,
+                  radius: 16,
                   backgroundImage: NetworkImage(mention.avatarUrl!),
                 )
               else
                 CircleAvatar(
-                  radius: 16.0,
+                  radius: 16,
                   backgroundColor:
                       mentionColor ?? Theme.of(context).colorScheme.primary,
                   child: Text(

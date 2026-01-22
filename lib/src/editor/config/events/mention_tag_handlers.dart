@@ -53,13 +53,13 @@ class MentionTagState {
       tagSearch: config.tagSearch,
       dollarSearch: config.dollarSearch,
       maxHeight: config.maxHeight,
-      itemHeight: config.itemHeight,
       mentionItemBuilder: config.mentionItemBuilder,
       tagItemBuilder: config.tagItemBuilder,
       customData: config.customData,
       onLoadMoreMentions: config.onLoadMoreMentions,
       onLoadMoreTags: config.onLoadMoreTags,
       onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+      decoration: config.decoration,
       onItemCountChanged: (count) {
         _itemCount = count;
       },
@@ -95,13 +95,13 @@ class MentionTagState {
           tagSearch: config.tagSearch,
           dollarSearch: config.dollarSearch,
           maxHeight: config.maxHeight,
-          itemHeight: config.itemHeight,
           mentionItemBuilder: config.mentionItemBuilder,
           tagItemBuilder: config.tagItemBuilder,
           customData: config.customData,
           onLoadMoreMentions: config.onLoadMoreMentions,
           onLoadMoreTags: config.onLoadMoreTags,
           onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+          decoration: config.decoration,
           onItemCountChanged: (count) {
             _itemCount = count;
           },
@@ -143,13 +143,13 @@ class MentionTagState {
         tagSearch: config.tagSearch,
         dollarSearch: config.dollarSearch,
         maxHeight: config.maxHeight,
-        itemHeight: config.itemHeight,
         mentionItemBuilder: config.mentionItemBuilder,
         tagItemBuilder: config.tagItemBuilder,
         customData: config.customData,
         onLoadMoreMentions: config.onLoadMoreMentions,
         onLoadMoreTags: config.onLoadMoreTags,
         onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+        decoration: config.decoration,
         onItemCountChanged: (count) {
           _itemCount = count;
         },

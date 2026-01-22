@@ -36,6 +36,7 @@ class TextLine extends StatefulWidget {
     this.customStyleBuilder,
     this.customRecognizerBuilder,
     this.customLinkPrefixes = const <String>[],
+    this.placeholderTextStyle,
     super.key,
   });
 
@@ -52,6 +53,7 @@ class TextLine extends StatefulWidget {
   final LinkActionPicker linkActionPicker;
   final List<String> customLinkPrefixes;
   final TextRange composingRange;
+  final TextStyle? placeholderTextStyle;
 
   @override
   State<TextLine> createState() => _TextLineState();
@@ -384,6 +386,10 @@ class _TextLineState extends State<TextLine> {
     var textStyle = const TextStyle();
 
     if (widget.line.style.containsKey(Attribute.placeholder.key)) {
+      // Use custom placeholderTextStyle if provided, otherwise use default
+      if (widget.placeholderTextStyle != null) {
+        return widget.placeholderTextStyle!;
+      }
       return defaultStyles.placeHolder!.style;
     }
 
@@ -438,7 +444,9 @@ class _TextLineState extends State<TextLine> {
 
     if (isPlaceholderLine) {
       final oldStyle = textStyle;
-      textStyle = defaultStyles.placeHolder!.style;
+      // Use custom placeholderTextStyle if provided, otherwise use default
+      final placeholderStyle = widget.placeholderTextStyle ?? defaultStyles.placeHolder!.style;
+      textStyle = placeholderStyle;
       textStyle = textStyle.merge(oldStyle.copyWith(
         color: textStyle.color,
         backgroundColor: textStyle.backgroundColor,

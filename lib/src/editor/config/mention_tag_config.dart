@@ -19,6 +19,7 @@ class MentionTagConfig {
     this.onLoadMoreMentions,
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
+    this.decoration,
   });
 
   /// Callback to search for users when @ is typed
@@ -68,4 +69,8 @@ class MentionTagConfig {
   /// Parameters: (query, currentItems, currentPage)
   /// Should return a list of new items to append, or empty list if no more items
   final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreDollarTags;
+
+  /// Optional decoration for the suggestion overlay view
+  /// If not provided, defaults to card color with rounded corners and border
+  final BoxDecoration? decoration;
 }

@@ -661,6 +661,7 @@ class QuillRawEditorState extends EditorState
       onLaunchUrl: widget.config.onLaunchUrl,
       customLinkPrefixes: widget.config.customLinkPrefixes,
       composingRange: composingRange.value,
+      placeholderTextStyle: widget.config.placeholderTextStyle,
     );
     final editableTextLine = EditableTextLine(
         node,

@@ -11,6 +11,8 @@ import 'quill_icon_button.dart';
 
 /// A toolbar button that inserts the '$' symbol to trigger currency/dollar tags.
 ///
+/// **Feature Flag**: ✅ Available - See [README.md](../../../../README.md#-mentions--tags-toolbar-buttons) for documentation
+///
 /// When clicked, this button inserts '$' at the current cursor position,
 /// which automatically triggers the currency tag overlay to appear, allowing
 /// users to search and select from a list of available currency values.

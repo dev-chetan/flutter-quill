@@ -292,11 +292,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               );
             },
             child: (_isOverlayVisible && overlayWidget != null)
-                ? Padding(
-                    key: const ValueKey('suggestion_view'),
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: overlayWidget,
-                  )
+                ? overlayWidget
                 : const SizedBox.shrink(key: ValueKey('empty')),
           ),
         ]));

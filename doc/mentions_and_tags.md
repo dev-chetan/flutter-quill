@@ -66,6 +66,10 @@ Optional parameters:
 - `tagItemBuilder`: Custom builder for tag items (allows full UI customization)
 - `customData`: Custom data passed to builders (for additional context)
 - `dollarSearch`: Callback to search for currency tags when $ is typed
+- `onLoadMoreMentions`: Callback to load more mentions when user scrolls to bottom (pagination)
+- `onLoadMoreTags`: Callback to load more tags when user scrolls to bottom (pagination)
+- `onLoadMoreDollarTags`: Callback to load more dollar tags when user scrolls to bottom (pagination)
+- `decoration`: Custom decoration for the suggestion overlay view
 
 ## Data Models
 
@@ -349,6 +353,100 @@ setState(() {
 });
 ```
 
+## Load More / Pagination
+
+The mention and tag overlays support pagination through load more callbacks. When the user scrolls near the bottom of the list (within 100px), the load more callback is automatically triggered.
+
+### Load More Callback Signature
+
+```dart
+Future<List<MentionItem>> Function(
+  String query,           // Current search query
+  List<MentionItem> currentItems,  // Items currently displayed
+  int currentPage,        // Current page number (0-indexed)
+)? onLoadMoreMentions;
+
+Future<List<TagItem>> Function(
+  String query,
+  List<TagItem> currentItems,
+  int currentPage,
+)? onLoadMoreTags;
+
+Future<List<TagItem>> Function(
+  String query,
+  List<TagItem> currentItems,
+  int currentPage,
+)? onLoadMoreDollarTags;
+```
+
+### Example: Load More with Pagination
+
+```dart
+MentionTagConfig(
+  mentionSearch: (query) async {
+    // Return first page (e.g., 20 items)
+    final response = await api.searchUsers(query, page: 1, limit: 20);
+    return response.users;
+  },
+  onLoadMoreMentions: (query, currentItems, currentPage) async {
+    // Load next page
+    // currentPage is 0-indexed, so first load more call has currentPage = 1
+    final nextPage = currentPage + 1;
+    final response = await api.searchUsers(query, page: nextPage, limit: 20);
+    
+    // Return empty list when no more items
+    if (response.users.isEmpty || !response.hasMore) {
+      return [];
+    }
+    
+    return response.users;
+  },
+  // ... other config
+)
+```
+
+### Example: Simple List Pagination
+
+```dart
+final List<MentionItem> _allUsers = List.generate(200, (index) => 
+  MentionItem(id: 'user_$index', name: 'User $index')
+);
+
+Future<List<MentionItem>> _loadMoreMentions(
+  String query,
+  List<MentionItem> currentItems,
+  int currentPage,
+) async {
+  // Filter by query
+  final filtered = query.isEmpty 
+    ? _allUsers 
+    : _allUsers.where((u) => u.name.contains(query)).toList();
+  
+  // Calculate next page
+  const itemsPerPage = 20;
+  final startIndex = (currentPage + 1) * itemsPerPage;
+  final endIndex = (startIndex + itemsPerPage).clamp(0, filtered.length);
+  
+  // Return empty if no more items
+  if (startIndex >= filtered.length) {
+    return [];
+  }
+  
+  return filtered.sublist(startIndex, endIndex);
+}
+```
+
+### Key Points
+
+- **Automatic Triggering**: Load more is called automatically when user scrolls near bottom (100px threshold)
+- **Page Numbers**: First page (page 0) is handled by the search callback, load more handles pages 1, 2, 3...
+- **Return Empty List**: Return `[]` when there are no more items to stop pagination
+- **Query Filtering**: Always filter by the current query to maintain search context
+- **Loading Indicator**: A loading indicator automatically appears at the bottom while loading
+- **Error Handling**: Return empty list on errors to gracefully stop pagination
+
+See [Load More Example](./examples/load_more_example.dart) for complete working examples.
+
 ## Features
 
 - **Smooth Animations**: List items animate smoothly when data changes
@@ -357,6 +455,7 @@ setState(() {
 - **Keyboard Navigation**: Full keyboard support with arrow keys and Enter
 - **Debounced Search**: Prevents excessive API calls during typing
 - **Empty Query Support**: Shows all data immediately when trigger character is typed (#, @, or $)
+- **Pagination Support**: Automatic load more when scrolling to bottom
 
 ## Notes
 
