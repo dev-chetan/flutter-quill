@@ -88,6 +88,7 @@ class QuillEditorConfig {
     this.readOnlyMouseCursor = SystemMouseCursors.text,
     this.onPerformAction,
     @experimental this.customLeadingBlockBuilder,
+    this.hidePlaceholderOnFormat = false,
     this.mentionTagConfig,
   });
 
@@ -100,6 +101,10 @@ class QuillEditorConfig {
   /// Custom text style for the placeholder text
   /// If not provided, uses the default placeholder style from [DefaultStyles]
   final TextStyle? placeholderTextStyle;
+
+  /// When true, hides the placeholder if any formatting is active
+  /// (e.g. block quote toggled) even when the document is empty.
+  final bool hidePlaceholderOnFormat;
 
   /// Contains all the events that will be handled when
   /// the exact characters satifies the condition. This mean
@@ -542,6 +547,7 @@ class QuillEditorConfig {
     void Function()? onScribbleActivated,
     EdgeInsets? scribbleAreaInsets,
     void Function(TextInputAction action)? onPerformAction,
+    bool? hidePlaceholderOnFormat,
   }) {
     return QuillEditorConfig(
       customLeadingBlockBuilder:
@@ -612,6 +618,8 @@ class QuillEditorConfig {
       onScribbleActivated: onScribbleActivated ?? this.onScribbleActivated,
       scribbleAreaInsets: scribbleAreaInsets ?? this.scribbleAreaInsets,
       onPerformAction: onPerformAction ?? this.onPerformAction,
+      hidePlaceholderOnFormat:
+          hidePlaceholderOnFormat ?? this.hidePlaceholderOnFormat,
     );
   }
 }

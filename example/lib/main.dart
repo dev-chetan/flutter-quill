@@ -72,13 +72,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     // Load document
-    _controller.document = Document.fromJson([
-      {
-        'insert':
-            'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.'
-      },
-      {'insert': '\n'}
-    ]);
+    _controller.document = Document();
   }
 
   @override
@@ -101,7 +95,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          /*QuillSimpleToolbar(
+          QuillSimpleToolbar(
             controller: _controller,
             config: QuillSimpleToolbarConfig(
               embedButtons: FlutterQuillEmbeds.toolbarButtons(),
@@ -149,7 +143,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-          ),*/
+          ),
           Expanded(
             child: MentionTagWrapper(
               controller: _controller,
@@ -533,8 +527,8 @@ class _HomePageState extends State<HomePage> {
                 scrollController: _editorScrollController,
                 controller: _controller,
                 config: QuillEditorConfig(
-                  placeholder:
-                      'Start writing your notes...\nTry typing @ for mentions or # for tags',
+                  placeholder: 'Start writing your notes...',
+                  hidePlaceholderOnFormat: true,
                   padding: const EdgeInsets.all(16),
                   embedBuilders: [
                     ...FlutterQuillEmbeds.editorBuilders(

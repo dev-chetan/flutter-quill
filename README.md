@@ -243,6 +243,17 @@ The `QuillSimpleToolbar` and `QuillEditor` widgets are both customizable.
 - [🎨 Custom Toolbar](./doc/custom_toolbar.md)
 - [👤 Mentions & Tags](./doc/mentions_and_tags.md)
 
+### 🧾 Placeholder Behavior
+
+Hide the placeholder when formatting is active (e.g. block quote toggled):
+
+```dart
+QuillEditorConfig(
+  placeholder: 'Type something',
+  hidePlaceholderOnFormat: true,
+)
+```
+
 ### 👤 Mentions & Tags Toolbar Buttons
 
 Flutter Quill provides three toolbar buttons for mentions and tags functionality:

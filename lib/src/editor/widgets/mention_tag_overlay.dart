@@ -589,7 +589,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
             constraints: BoxConstraints(maxHeight: widget.maxHeight),
             child: widget.isMention
                 ? ListView.builder(
-                    key: ValueKey('mentions_list_v$_listVersion'),
+                    key: const PageStorageKey('mentions_list'),
                     controller: _scrollController,
                     itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
                     shrinkWrap: true,
@@ -612,7 +612,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                       );
                     })
                 : ListView.builder(
-                    key: ValueKey('tags_list_v$_listVersion'),
+                    key: const PageStorageKey('tags_list'),
                     controller: _scrollController,
                     itemCount: _tags.length + (_isLoadingMore ? 1 : 0),
                     shrinkWrap: true,
