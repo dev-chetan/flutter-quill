@@ -43,6 +43,13 @@ class _TriggerQueryResult {
   _TriggerQueryResult(this.query, this.position);
 }
 
+class _ActiveTriggerResult {
+  final String trigger;
+  final _TriggerQueryResult result;
+
+  _ActiveTriggerResult(this.trigger, this.result);
+}
+
 class _MentionTagWrapperState extends State<MentionTagWrapper> {
   MentionTagState? _mentionTagState;
   StreamSubscription<DocChange>? _changeSubscription;
@@ -165,10 +172,20 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final tagHashResult = _getCurrentQueryForTrigger('#');
     final tagDollarResult = _getCurrentQueryForTrigger('\$');
 
-    if (mentionResult != null) {
+    final activeTrigger =
+        _pickActiveTrigger(mentionResult, tagHashResult, tagDollarResult);
+    if (activeTrigger == null) {
+      // Not in any mention/tag context, hide overlay if it exists
+      if (_isOverlayVisible) {
+        _hideOverlay();
+      }
+      return;
+    }
+
+    if (activeTrigger.trigger == '@') {
       // We're in a mention context
-      final mentionQuery = mentionResult.query;
-      final mentionPosition = mentionResult.position;
+      final mentionQuery = activeTrigger.result.query;
+      final mentionPosition = activeTrigger.result.position;
       // If query ends with space, treat it as completion and avoid keeping overlay open.
       if (mentionQuery.endsWith(' ')) {
         if (_isOverlayVisible && _isMention) {
@@ -185,10 +202,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     }
 
     // Check for # tag context
-    if (tagHashResult != null) {
+    if (activeTrigger.trigger == '#') {
       // We're in a # tag context
-      final tagQuery = tagHashResult.query;
-      final tagPosition = tagHashResult.position;
+      final tagQuery = activeTrigger.result.query;
+      final tagPosition = activeTrigger.result.position;
       if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
         _mentionTagState?.updateQuery(tagQuery);
       } else {
@@ -207,10 +224,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     }
 
     // Check for $ tag context
-    if (tagDollarResult != null) {
+    if (activeTrigger.trigger == '\$') {
       // We're in a $ tag context
-      final tagQuery = tagDollarResult.query;
-      final tagPosition = tagDollarResult.position;
+      final tagQuery = activeTrigger.result.query;
+      final tagPosition = activeTrigger.result.position;
       if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
         _mentionTagState?.updateQuery(tagQuery);
       } else {
@@ -223,11 +240,25 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       }
       return;
     }
+  }
 
-    // Not in any mention/tag context, hide overlay if it exists
-    if (_isOverlayVisible) {
-      _hideOverlay();
+  _ActiveTriggerResult? _pickActiveTrigger(
+    _TriggerQueryResult? mention,
+    _TriggerQueryResult? hash,
+    _TriggerQueryResult? dollar,
+  ) {
+    _ActiveTriggerResult? best;
+    void consider(String trigger, _TriggerQueryResult? result) {
+      if (result == null) return;
+      if (best == null || result.position > best!.result.position) {
+        best = _ActiveTriggerResult(trigger, result);
+      }
     }
+
+    consider('@', mention);
+    consider('#', hash);
+    consider('\$', dollar);
+    return best;
   }
 
   String? _getCurrentQuery() {
