@@ -59,6 +59,7 @@ class MentionTagState {
       onLoadMoreMentions: config.onLoadMoreMentions,
       onLoadMoreTags: config.onLoadMoreTags,
       onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+      loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
       decoration: config.decoration,
       onItemCountChanged: (count) {
         _itemCount = count;
@@ -101,6 +102,7 @@ class MentionTagState {
           onLoadMoreMentions: config.onLoadMoreMentions,
           onLoadMoreTags: config.onLoadMoreTags,
           onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+          loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
           decoration: config.decoration,
           onItemCountChanged: (count) {
             _itemCount = count;
@@ -149,6 +151,7 @@ class MentionTagState {
         onLoadMoreMentions: config.onLoadMoreMentions,
         onLoadMoreTags: config.onLoadMoreTags,
         onLoadMoreDollarTags: config.onLoadMoreDollarTags,
+        loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
         decoration: config.decoration,
         onItemCountChanged: (count) {
           _itemCount = count;

@@ -66,6 +66,13 @@ typedef TagItemBuilder = Widget Function(
   dynamic customData,
 );
 
+/// Builder for the "load more" indicator at the bottom of the list
+typedef LoadMoreIndicatorBuilder = Widget Function(
+  BuildContext context,
+  bool isMention,
+  String tagTrigger,
+);
+
 /// Overlay widget that shows mention/tag list above keyboard
 class MentionTagOverlay extends StatefulWidget {
   const MentionTagOverlay({
@@ -85,6 +92,7 @@ class MentionTagOverlay extends StatefulWidget {
     this.onLoadMoreMentions,
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
+    this.loadMoreIndicatorBuilder,
     this.decoration,
     super.key,
   });
@@ -113,6 +121,7 @@ class MentionTagOverlay extends StatefulWidget {
   final Future<List<TagItem>> Function(
           String query, List<TagItem> currentItems, int currentPage)?
       onLoadMoreDollarTags;
+  final LoadMoreIndicatorBuilder? loadMoreIndicatorBuilder;
   final BoxDecoration? decoration; // Custom decoration for the suggestion view
 
   @override
@@ -596,12 +605,17 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                     itemBuilder: (context, index) {
                       // Show loading indicator at the bottom
                       if (index == _mentions.length) {
-                        return const SizedBox(
-                            child: Center(
-                                child: Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))));
+                        return widget.loadMoreIndicatorBuilder?.call(
+                              context,
+                              true,
+                              widget.tagTrigger,
+                            ) ??
+                            const SizedBox(
+                                child: Center(
+                                    child: Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))));
                       }
                       final isSelected = index == _selectedIndex;
                       return _buildAnimatedItem(
@@ -619,10 +633,16 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                     itemBuilder: (context, index) {
                       // Show loading indicator at the bottom
                       if (index == _tags.length) {
-                        return const Center(
-                            child: Padding(
-                                padding: EdgeInsets.all(8),
-                                child: CircularProgressIndicator(strokeWidth: 2)));
+                        return widget.loadMoreIndicatorBuilder?.call(
+                              context,
+                              false,
+                              widget.tagTrigger,
+                            ) ??
+                            const Center(
+                                child: Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2)));
                       }
                       final isSelected = index == _selectedIndex;
                       return _buildAnimatedItem(

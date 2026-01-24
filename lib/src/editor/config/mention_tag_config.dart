@@ -21,6 +21,7 @@ class MentionTagConfig {
     this.onLoadMoreMentions,
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
+    this.loadMoreIndicatorBuilder,
     this.decoration,
   });
 
@@ -79,6 +80,10 @@ class MentionTagConfig {
   /// Parameters: (query, currentItems, currentPage)
   /// Should return a list of new items to append, or empty list if no more items
   final Future<List<TagItem>> Function(String query, List<TagItem> currentItems, int currentPage)? onLoadMoreDollarTags;
+
+  /// Optional builder for the "load more" indicator at the bottom of the list.
+  /// If not provided, a default circular progress indicator is shown.
+  final Widget Function(BuildContext context, bool isMention, String tagTrigger)? loadMoreIndicatorBuilder;
 
   /// Optional decoration for the suggestion overlay view
   /// If not provided, defaults to card color with rounded corners and border

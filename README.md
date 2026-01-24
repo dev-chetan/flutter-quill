@@ -318,6 +318,23 @@ MentionTagConfig(
 )
 ```
 
+**Custom Load More Indicator:**
+
+```dart
+MentionTagConfig(
+  loadMoreIndicatorBuilder: (context, isMention, trigger) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Center(
+        child: Text(
+          isMention ? 'Loading more users...' : 'Loading more tags...',
+        ),
+      ),
+    );
+  },
+)
+```
+
 **Load More Callback Parameters:**
 - `query`: Current search query string
 - `currentItems`: List of items currently displayed
