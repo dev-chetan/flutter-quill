@@ -1059,25 +1059,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
   String _buildCanonicalTagText(String triggerChar, TagItem item) {
     if (triggerChar == '\$') {
-      final numericValue = double.tryParse(item.name);
-      if (numericValue != null) {
-        final formattedValue = numericValue.toStringAsFixed(
-            numericValue.truncateToDouble() == numericValue ? 0 : 2);
-        final parts = formattedValue.split('.');
-        final integerPart = parts[0];
-        final decimalPart = parts.length > 1 ? parts[1] : '';
-
-        String formattedInteger = '';
-        for (int i = integerPart.length - 1; i >= 0; i--) {
-          if ((integerPart.length - 1 - i) % 3 == 0 &&
-              i < integerPart.length - 1) {
-            formattedInteger = ',$formattedInteger';
-          }
-          formattedInteger = integerPart[i] + formattedInteger;
-        }
-
-        return '\$$formattedInteger${decimalPart.isNotEmpty ? '.$decimalPart' : ''}';
-      }
+      // Keep raw text as-is for $ tags (no numeric formatting)
       return '\$${item.name}';
     }
     return '#${item.name}';

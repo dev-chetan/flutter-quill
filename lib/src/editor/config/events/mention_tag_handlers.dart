@@ -243,35 +243,11 @@ class MentionTagState {
     // Calculate how much to delete
     final deleteLength = controller.selection.baseOffset - actualPosition;
 
-    // Format tag text - for $ tags, format as currency if name is numeric
+    // Format tag text
     String tagText;
     if (triggerChar == '\$') {
-      // Try to parse as number and format as currency
-      final numericValue = double.tryParse(item.name);
-      if (numericValue != null) {
-        // Format with commas for thousands
-        final formattedValue = numericValue.toStringAsFixed(
-            numericValue.truncateToDouble() == numericValue ? 0 : 2);
-        final parts = formattedValue.split('.');
-        final integerPart = parts[0];
-        final decimalPart = parts.length > 1 ? parts[1] : '';
-
-        // Add commas for thousands
-        String formattedInteger = '';
-        for (int i = integerPart.length - 1; i >= 0; i--) {
-          if ((integerPart.length - 1 - i) % 3 == 0 &&
-              i < integerPart.length - 1) {
-            formattedInteger = ',$formattedInteger';
-          }
-          formattedInteger = integerPart[i] + formattedInteger;
-        }
-
-        tagText =
-            '\$$formattedInteger${decimalPart.isNotEmpty ? '.$decimalPart' : ''}';
-      } else {
-        // Not numeric, just use name as is
-        tagText = '\$${item.name}';
-      }
+      // Keep raw text as-is for $ tags (no numeric formatting)
+      tagText = '\$${item.name}';
     } else {
       // For # tags, use as is
       tagText = '$triggerChar${item.name}';
