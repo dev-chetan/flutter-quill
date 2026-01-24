@@ -187,11 +187,13 @@ class MentionTagState {
     // Insert mention text with attribute after a small delay to allow animation
     Future.delayed(const Duration(milliseconds: 100), () {
       final mentionText = '@${item.name}';
+      final shouldAppendSpace = config.appendSpaceAfterSelection;
+      final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
       controller.replaceText(
         actualPosition,
         deleteLength,
-        mentionText,
-        TextSelection.collapsed(offset: actualPosition + mentionText.length),
+        insertedText,
+        TextSelection.collapsed(offset: actualPosition + insertedText.length),
       );
 
       // Apply mention attribute
@@ -277,11 +279,13 @@ class MentionTagState {
 
     // Insert tag text with attribute after a small delay to allow animation
     Future.delayed(const Duration(milliseconds: 100), () {
+      final shouldAppendSpace = config.appendSpaceAfterSelection;
+      final insertedText = shouldAppendSpace ? '$tagText ' : tagText;
       controller.replaceText(
         actualPosition,
         deleteLength,
-        tagText,
-        TextSelection.collapsed(offset: actualPosition + tagText.length),
+        insertedText,
+        TextSelection.collapsed(offset: actualPosition + insertedText.length),
       );
 
       // Apply tag attribute - use CurrencyAttribute for $ tags, TagAttribute for # tags
@@ -297,6 +301,7 @@ class MentionTagState {
           }),
         );
       } else {
+        final color = config.defaultHashTagColor;
         controller.formatText(
           actualPosition,
           tagText.length,
@@ -304,7 +309,7 @@ class MentionTagState {
             'id': item.id,
             'name': item.name,
             if (item.count != null) 'count': item.count,
-            if (item.color != null) 'color': item.color,
+            if (color != null) 'color': color,
           }),
         );
       }
@@ -412,7 +417,10 @@ String extractQuery(QuillController controller, bool isMention,
 
   // Find the trigger character
   while (startPos >= 0 && plainText[startPos] != triggerChar) {
-    if (plainText[startPos] == ' ' || plainText[startPos] == '\n') {
+    // For mentions and $ tags allow spaces in the query (names with spaces).
+    // For # tags, a space ends the query.
+    if ((!isMention && triggerChar == '#' && plainText[startPos] == ' ') ||
+        plainText[startPos] == '\n') {
       return '';
     }
     startPos--;

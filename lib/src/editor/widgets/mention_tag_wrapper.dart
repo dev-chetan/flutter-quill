@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../controller/quill_controller.dart';
+import '../../document/attribute.dart';
+import '../../document/custom_attributes.dart';
 import '../../document/document.dart';
 import '../../document/structs/doc_change.dart';
 import '../config/events/mention_tag_handlers.dart';
 import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
+import '../widgets/mention_tag_overlay.dart';
 
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
@@ -23,7 +26,7 @@ class MentionTagWrapper extends StatefulWidget {
   final QuillController controller;
   final Widget child;
   final MentionTagConfig config;
-  
+
   /// Optional controller to refresh the suggestion list
   /// If provided, you can call [MentionTagController.refresh] to update the list
   final MentionTagController? mentionTagController;
@@ -47,6 +50,9 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   String _currentQuery = '';
   bool _isMention = false;
   String _tagTrigger = '#';
+  Timer? _tagCheckDebounceTimer;
+  String _lastCheckedTagQuery = '';
+  Timer? _mentionSpaceDebounceTimer;
 
   @override
   void initState() {
@@ -77,6 +83,9 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     // Listen to document changes to detect @, #, and $ triggers
     _changeSubscription = widget.controller.document.changes.listen((change) {
       if (change.source == ChangeSource.local) {
+        _checkForMentionEditRemoval(change);
+        _checkForCurrencyEditRemoval(change);
+        _checkForTagTriggerDeletion(change);
         _checkForMentionOrTag();
       }
     });
@@ -85,6 +94,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   @override
   void dispose() {
     _changeSubscription?.cancel();
+    _tagCheckDebounceTimer?.cancel();
+    _mentionSpaceDebounceTimer?.cancel();
     _mentionTagState?.dispose();
     super.dispose();
   }
@@ -102,6 +113,18 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       _hideOverlay();
       return;
     }
+
+    // If user typed a mention manually (no suggestion selection), apply mention
+    // attribute (and thus color) when they hit space. Supports names with spaces
+    // like "@john doe ".
+    _checkForMentionAfterSpace();
+
+    // If user typed a $ tag manually, apply currency attribute when they hit
+    // space (same behavior as mentions).
+    _checkForDollarAfterSpace();
+
+    // Check if space was just typed after a # tag trigger
+    _checkForTagAfterSpace();
 
     // Check for @ mention
     if (handleMentionTrigger(widget.controller)) {
@@ -146,6 +169,13 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       // We're in a mention context
       final mentionQuery = mentionResult.query;
       final mentionPosition = mentionResult.position;
+      // If query ends with space, treat it as completion and avoid keeping overlay open.
+      if (mentionQuery.endsWith(' ')) {
+        if (_isOverlayVisible && _isMention) {
+          _hideOverlay();
+        }
+        return;
+      }
       if (_isOverlayVisible && _isMention) {
         _mentionTagState?.updateQuery(mentionQuery);
       } else {
@@ -164,6 +194,15 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       } else {
         _showOverlay(false, tagPosition, tagQuery, tagTrigger: '#');
       }
+      // If default hash tag color is set, apply it immediately while typing.
+      if (tagQuery.isNotEmpty && widget.config.defaultHashTagColor != null) {
+        _applyDefaultHashTagColor(tagPosition, tagQuery);
+        return;
+      }
+      // Otherwise, check if typed tag matches any tag in the list and apply color.
+      if (tagQuery != _lastCheckedTagQuery && tagQuery.isNotEmpty) {
+        _checkAndApplyTypedTag('#', tagQuery, tagPosition);
+      }
       return;
     }
 
@@ -176,6 +215,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         _mentionTagState?.updateQuery(tagQuery);
       } else {
         _showOverlay(false, tagPosition, tagQuery, tagTrigger: '\$');
+      }
+      // Also check if typed tag matches any tag in the list and apply color
+      // Only check if query changed and has at least 1 character
+      if (tagQuery != _lastCheckedTagQuery && tagQuery.isNotEmpty) {
+        _checkAndApplyTypedTag('\$', tagQuery, tagPosition);
       }
       return;
     }
@@ -223,7 +267,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // Find trigger character
     while (pos >= 0 && plainText[pos] != triggerChar) {
-      if (plainText[pos] == ' ' || plainText[pos] == '\n') {
+    // For mentions and $ tags, allow spaces in the query (names with spaces).
+    // For # tags, a space ends the query.
+    if ((triggerChar == '#' && plainText[pos] == ' ') ||
+          plainText[pos] == '\n') {
         return null;
       }
       pos--;
@@ -262,6 +309,783 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   /// Call this method when your data source has been updated
   void refreshSuggestionList() {
     _mentionTagState?.refreshList();
+  }
+
+  /// If user deletes the trigger character `@` / `#` / `$`, remove the related
+  /// inline attribute (mention/tag/currency) so the color is removed too.
+  void _checkForTagTriggerDeletion(DocChange change) {
+    final selection = widget.controller.selection;
+    if (!selection.isCollapsed) return;
+
+    // Reconstruct the plain text BEFORE the change so we can know what was deleted.
+    final beforeDoc = Document.fromDelta(change.before);
+    final beforeText = beforeDoc.toPlainText();
+    final afterText = widget.controller.document.toPlainText();
+    if (beforeText.isEmpty || afterText.isEmpty) return;
+
+    var beforeOffset = 0;
+    var afterOffset = 0;
+
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        final n = op.length ?? 0;
+        beforeOffset += n;
+        afterOffset += n;
+        continue;
+      }
+
+      if (op.isInsert) {
+        final insertedLen =
+            (op.data is String) ? (op.data as String).length : 1;
+        afterOffset += insertedLen;
+        continue;
+      }
+
+      if (op.isDelete) {
+        final deleteLen = op.length ?? 0;
+        if (deleteLen <= 0) continue;
+
+        final end = (beforeOffset + deleteLen).clamp(0, beforeText.length);
+        final deletedText = beforeText.substring(beforeOffset, end);
+
+        // If the trigger was deleted, remove the attribute span starting at the
+        // corresponding position in the AFTER document.
+        if (deletedText.contains('@')) {
+          _removeInlineAttributeSpanAt(afterOffset,
+              attributeKey: Attribute.mention.key);
+          if (afterOffset > 0) {
+            _removeInlineAttributeSpanAt(afterOffset - 1,
+                attributeKey: Attribute.mention.key);
+          }
+        }
+        if (deletedText.contains('#')) {
+          _removeInlineAttributeSpanAt(afterOffset,
+              attributeKey: Attribute.tag.key);
+          if (afterOffset > 0) {
+            _removeInlineAttributeSpanAt(afterOffset - 1,
+                attributeKey: Attribute.tag.key);
+          }
+        }
+        if (deletedText.contains('\$')) {
+          _removeInlineAttributeSpanAt(afterOffset,
+              attributeKey: Attribute.currency.key);
+          if (afterOffset > 0) {
+            _removeInlineAttributeSpanAt(afterOffset - 1,
+                attributeKey: Attribute.currency.key);
+          }
+        }
+        beforeOffset += deleteLen;
+      }
+    }
+  }
+
+  /// Remove mention attribute if user edits within an existing mention.
+  void _checkForMentionEditRemoval(DocChange change) {
+    final selection = widget.controller.selection;
+    if (!selection.isCollapsed) return;
+
+    final beforeDoc = Document.fromDelta(change.before);
+    final beforeText = beforeDoc.toPlainText();
+    if (beforeText.isEmpty) return;
+
+    var beforeOffset = 0;
+    var afterOffset = 0;
+
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        final n = op.length ?? 0;
+        beforeOffset += n;
+        afterOffset += n;
+        continue;
+      }
+
+      if (op.isInsert) {
+        final insertLen = (op.data is String) ? (op.data as String).length : 1;
+        final insertPos = afterOffset;
+        afterOffset += insertLen;
+
+        // If inserted text ends up inside a mention, remove the mention attribute.
+        _removeInlineAttributeSpanAt(insertPos,
+            attributeKey: Attribute.mention.key,
+            onlyIfHasAttributeAtPosition: true);
+        continue;
+      }
+
+      if (op.isDelete) {
+        final deleteLen = op.length ?? 0;
+        if (deleteLen <= 0) continue;
+
+        final hasMentionInDeletedRange = _deletedRangeHasAttribute(
+          beforeDoc,
+          beforeOffset,
+          deleteLen,
+          Attribute.mention.key,
+        );
+
+        if (hasMentionInDeletedRange) {
+          _removeInlineAttributeSpanAt(afterOffset,
+              attributeKey: Attribute.mention.key);
+          if (afterOffset > 0) {
+            _removeInlineAttributeSpanAt(afterOffset - 1,
+                attributeKey: Attribute.mention.key);
+          }
+        }
+
+        beforeOffset += deleteLen;
+      }
+    }
+  }
+
+  void _checkForCurrencyEditRemoval(DocChange change) {
+    final selection = widget.controller.selection;
+    if (!selection.isCollapsed) return;
+
+    final beforeDoc = Document.fromDelta(change.before);
+    final beforeText = beforeDoc.toPlainText();
+    if (beforeText.isEmpty) return;
+
+    var beforeOffset = 0;
+    var afterOffset = 0;
+
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        final n = op.length ?? 0;
+        beforeOffset += n;
+        afterOffset += n;
+        continue;
+      }
+
+      if (op.isInsert) {
+        final insertLen =
+            (op.data is String) ? (op.data as String).length : 1;
+        final insertPos = afterOffset;
+        afterOffset += insertLen;
+
+        _removeInlineAttributeSpanAt(insertPos,
+            attributeKey: Attribute.currency.key,
+            onlyIfHasAttributeAtPosition: true);
+        continue;
+      }
+
+      if (op.isDelete) {
+        final deleteLen = op.length ?? 0;
+        if (deleteLen <= 0) continue;
+
+        final hasCurrencyInDeletedRange = _deletedRangeHasAttribute(
+          beforeDoc,
+          beforeOffset,
+          deleteLen,
+          Attribute.currency.key,
+        );
+
+        if (hasCurrencyInDeletedRange) {
+          _removeInlineAttributeSpanAt(afterOffset,
+              attributeKey: Attribute.currency.key);
+          if (afterOffset > 0) {
+            _removeInlineAttributeSpanAt(afterOffset - 1,
+                attributeKey: Attribute.currency.key);
+          }
+        }
+
+        beforeOffset += deleteLen;
+      }
+    }
+  }
+
+  bool _deletedRangeHasAttribute(
+    Document beforeDoc,
+    int start,
+    int len,
+    String attributeKey,
+  ) {
+    if (len <= 0) return false;
+    final text = beforeDoc.toPlainText();
+    if (text.isEmpty) return false;
+
+    final end = (start + len).clamp(0, text.length);
+    for (var i = start; i < end; i++) {
+      final style = beforeDoc.collectStyle(i, 1);
+      if (style.attributes.containsKey(attributeKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _removeInlineAttributeSpanAt(
+    int position, {
+    required String attributeKey,
+    bool onlyIfHasAttributeAtPosition = false,
+  }) {
+    if (position < 0) return;
+
+    final plainText = widget.controller.document.toPlainText();
+    if (plainText.isEmpty || position >= plainText.length) return;
+
+    final style = widget.controller.document.collectStyle(position, 1);
+    final hasAttr = style.attributes.containsKey(attributeKey);
+    if (onlyIfHasAttributeAtPosition && !hasAttr) return;
+    if (!hasAttr) return;
+
+    // Find the full contiguous span where this attribute exists.
+    var start = position;
+    while (start > 0) {
+      final prevStyle = widget.controller.document.collectStyle(start - 1, 1);
+      if (!prevStyle.attributes.containsKey(attributeKey)) break;
+      start--;
+    }
+
+    var end = position + 1;
+    while (end < plainText.length) {
+      final nextStyle = widget.controller.document.collectStyle(end, 1);
+      if (!nextStyle.attributes.containsKey(attributeKey)) break;
+      end++;
+    }
+
+    final len = end - start;
+    if (len <= 0) return;
+
+    // Remove by setting the attribute value to null.
+    if (attributeKey == Attribute.mention.key) {
+      widget.controller.formatText(start, len, MentionAttribute(value: null));
+    } else if (attributeKey == Attribute.tag.key) {
+      widget.controller.formatText(start, len, TagAttribute(value: null));
+    } else if (attributeKey == Attribute.currency.key) {
+      widget.controller.formatText(start, len, CurrencyAttribute(value: null));
+    }
+  }
+
+  void _checkForMentionAfterSpace() {
+    final selection = widget.controller.selection;
+    final plainText = widget.controller.document.toPlainText();
+
+    if (selection.baseOffset == 0 || plainText.isEmpty) return;
+
+    // Only when the last typed char is a space.
+    final charBefore =
+        selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
+    if (charBefore != ' ') return;
+
+    // Avoid doing work repeatedly on consecutive spaces.
+    if (selection.baseOffset > 1 &&
+        plainText[selection.baseOffset - 2] == ' ') {
+      return;
+    }
+
+    final mentionEnd = selection.baseOffset - 1; // exclude the space
+
+    // Scan backwards to find an '@' which is at start-of-word.
+    int? atPos;
+    for (var i = mentionEnd - 1; i >= 0; i--) {
+      final ch = plainText[i];
+      if (ch == '\n') {
+        return; // don't cross lines
+      }
+      if (ch == '@') {
+        if (i == 0 || plainText[i - 1] == ' ' || plainText[i - 1] == '\n') {
+          atPos = i;
+        }
+        break;
+      }
+    }
+    if (atPos == null) return;
+
+    final rawName = plainText.substring(atPos + 1, mentionEnd);
+    final name = _normalizeWhitespace(rawName);
+    if (name.isEmpty) return;
+
+    final mentionLen = mentionEnd - atPos; // include '@' + raw (with spaces)
+
+    // Debounce: if user keeps typing, we should not auto-apply.
+    _mentionSpaceDebounceTimer?.cancel();
+    final expectedAt = atPos;
+    final expectedName = name;
+    final expectedLen = mentionLen;
+
+    _mentionSpaceDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      final currentText = widget.controller.document.toPlainText();
+      final currentSel = widget.controller.selection;
+      if (currentSel.baseOffset == 0 ||
+          currentSel.baseOffset > currentText.length) {
+        return;
+      }
+      if (currentText[currentSel.baseOffset - 1] != ' ') {
+        return;
+      }
+      if (expectedAt < 0 || expectedAt >= currentText.length) return;
+      final currentEnd = currentSel.baseOffset - 1;
+      if (currentEnd <= expectedAt) return;
+      final currentRaw = currentText.substring(expectedAt + 1, currentEnd);
+      if (_normalizeWhitespace(currentRaw).toLowerCase() !=
+          expectedName.toLowerCase()) {
+        return;
+      }
+
+      // If it's already a mention, don't re-apply.
+      final style =
+          widget.controller.document.collectStyle(expectedAt, expectedLen);
+      if (style.attributes.containsKey(Attribute.mention.key)) return;
+
+      _applyMentionIfFound(expectedName, expectedAt, expectedLen);
+    });
+  }
+
+  void _checkForDollarAfterSpace() {
+    final selection = widget.controller.selection;
+    final plainText = widget.controller.document.toPlainText();
+
+    if (selection.baseOffset == 0 || plainText.isEmpty) return;
+
+    // Only when the last typed char is a space.
+    final charBefore =
+        selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
+    if (charBefore != ' ') return;
+
+    // Avoid doing work repeatedly on consecutive spaces.
+    if (selection.baseOffset > 1 && plainText[selection.baseOffset - 2] == ' ') {
+      return;
+    }
+
+    final end = selection.baseOffset - 1; // exclude the space
+
+    // Scan backwards to find a '$' which is at start-of-word.
+    int? dollarPos;
+    for (var i = end - 1; i >= 0; i--) {
+      final ch = plainText[i];
+      if (ch == '\n') {
+        return; // don't cross lines
+      }
+      if (ch == '\$') {
+        if (i == 0 || plainText[i - 1] == ' ' || plainText[i - 1] == '\n') {
+          dollarPos = i;
+        }
+        break;
+      }
+    }
+    if (dollarPos == null) return;
+
+    final raw = plainText.substring(dollarPos + 1, end);
+    final name = _normalizeWhitespace(raw);
+    if (name.isEmpty) return;
+
+    final len = end - dollarPos; // include '$' + raw (with spaces)
+
+    _tagCheckDebounceTimer?.cancel();
+    final expectedPos = dollarPos;
+    final expectedName = name;
+    final expectedLen = len;
+
+    _tagCheckDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      final currentText = widget.controller.document.toPlainText();
+      final currentSel = widget.controller.selection;
+      if (currentSel.baseOffset == 0 ||
+          currentSel.baseOffset > currentText.length) {
+        return;
+      }
+      if (currentText[currentSel.baseOffset - 1] != ' ') {
+        return;
+      }
+      if (expectedPos < 0 || expectedPos >= currentText.length) return;
+      final currentEnd = currentSel.baseOffset - 1;
+      if (currentEnd <= expectedPos) return;
+      final currentRaw = currentText.substring(expectedPos + 1, currentEnd);
+      if (_normalizeWhitespace(currentRaw).toLowerCase() !=
+          expectedName.toLowerCase()) {
+        return;
+      }
+
+      final style =
+          widget.controller.document.collectStyle(expectedPos, expectedLen);
+      if (style.attributes.containsKey(Attribute.currency.key)) return;
+
+      _applyTagIfFound('\$', expectedName, expectedPos);
+    });
+  }
+
+  void _applyMentionIfFound(String name, int atPos, int mentionLen) {
+    widget.config.mentionSearch(name).then((mentions) {
+      if (!mounted) return;
+
+      MentionItem? match;
+      for (final m in mentions) {
+        if (_normalizeWhitespace(m.name).toLowerCase() ==
+            _normalizeWhitespace(name).toLowerCase()) {
+          match = m;
+          break;
+        }
+      }
+
+      if (match == null) {
+        // Fallback: ask for all and try exact match.
+        widget.config.mentionSearch('').then((all) {
+          if (!mounted) return;
+          MentionItem? m2;
+          for (final m in all) {
+            if (_normalizeWhitespace(m.name).toLowerCase() ==
+                _normalizeWhitespace(name).toLowerCase()) {
+              m2 = m;
+              break;
+            }
+          }
+          if (m2 == null) return;
+          _applyMentionAttribute(m2, atPos, mentionLen);
+        }).catchError((_) {});
+        return;
+      }
+
+      _applyMentionAttribute(match, atPos, mentionLen);
+    }).catchError((_) {});
+  }
+
+  void _applyMentionAttribute(MentionItem item, int atPos, int mentionLen) {
+    final canonicalText = '@${item.name}';
+    var finalLen = mentionLen;
+    final plainText = widget.controller.document.toPlainText();
+    if (atPos + mentionLen <= plainText.length) {
+      final currentText = plainText.substring(atPos, atPos + mentionLen);
+      if (currentText != canonicalText) {
+        final selection = widget.controller.selection;
+        final diff = canonicalText.length - mentionLen;
+        final updatedSelection = selection.copyWith(
+          baseOffset: selection.baseOffset >= atPos
+              ? selection.baseOffset + diff
+              : selection.baseOffset,
+          extentOffset: selection.extentOffset >= atPos
+              ? selection.extentOffset + diff
+              : selection.extentOffset,
+        );
+        widget.controller.replaceText(
+          atPos,
+          mentionLen,
+          canonicalText,
+          updatedSelection,
+        );
+        finalLen = canonicalText.length;
+      }
+    }
+    widget.controller.formatText(
+      atPos,
+      finalLen,
+      MentionAttribute(value: {
+        'id': item.id,
+        'name': item.name,
+        if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
+        if (item.color != null) 'color': item.color,
+      }),
+    );
+  }
+
+  /// Check if space was just typed after a tag trigger and apply tag attribute
+  void _checkForTagAfterSpace() {
+    final selection = widget.controller.selection;
+    final plainText = widget.controller.document.toPlainText();
+
+    if (selection.baseOffset == 0 || plainText.isEmpty) return;
+
+    // Check if the character before cursor is a space
+    final charBefore =
+        selection.baseOffset > 0 ? plainText[selection.baseOffset - 1] : null;
+
+    if (charBefore != ' ') return;
+
+    // Look backwards to find tag trigger (# or $)
+    var pos = selection.baseOffset - 2; // Skip the space
+    if (pos < 0) return;
+
+    String? triggerChar;
+    int? triggerPos;
+
+    // Find the trigger character
+    while (pos >= 0) {
+      if (plainText[pos] == '#' || plainText[pos] == '\$') {
+        triggerChar = plainText[pos];
+        triggerPos = pos;
+        break;
+      }
+      if (plainText[pos] == ' ' || plainText[pos] == '\n') {
+        // Hit a word boundary, no tag found
+        return;
+      }
+      pos--;
+    }
+
+    if (triggerChar == null || triggerPos == null) return;
+
+    // Check if there's a space or newline before the trigger (start of word)
+    if (triggerPos > 0) {
+      final charBeforeTrigger = plainText[triggerPos - 1];
+      if (charBeforeTrigger != ' ' && charBeforeTrigger != '\n') {
+        return;
+      }
+    }
+
+    // Extract tag name (between trigger and space)
+    final tagName =
+        plainText.substring(triggerPos + 1, selection.baseOffset - 1);
+    if (tagName.isEmpty) return;
+
+    // Check if this text already has a tag attribute
+    final style =
+        widget.controller.document.collectStyle(triggerPos, tagName.length + 1);
+    final hasTag = style.attributes.containsKey(Attribute.tag.key);
+    final hasCurrency = style.attributes.containsKey(Attribute.currency.key);
+
+    // If already has tag/currency attribute, don't re-apply
+    if (hasTag || hasCurrency) return;
+
+    // Only handle # tags here. $ tags are handled by _checkForDollarAfterSpace.
+    if (triggerChar != '#') return;
+
+    // For # tags, apply default color even without a match.
+    if (widget.config.defaultHashTagColor != null) {
+      _applyDefaultHashTagColor(triggerPos, tagName);
+      return;
+    }
+
+    // Search for matching tag and apply attribute
+    _applyTagIfFound(triggerChar, tagName, triggerPos);
+  }
+
+  /// Check if typed tag name matches any tag in the list and apply color
+  void _checkAndApplyTypedTag(
+      String triggerChar, String tagQuery, int tagPosition) {
+    if (tagQuery.isEmpty) return;
+
+    // Update last checked query
+    _lastCheckedTagQuery = tagQuery;
+
+    // Cancel any pending debounce timer
+    _tagCheckDebounceTimer?.cancel();
+
+    // Debounce the check to avoid excessive searches while typing
+    _tagCheckDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      // Re-check if we're still in the same tag context
+      final currentResult = triggerChar == '#'
+          ? _getCurrentQueryForTrigger('#')
+          : _getCurrentQueryForTrigger('\$');
+
+      if (currentResult == null || currentResult.query != tagQuery) {
+        // Query changed, don't apply
+        return;
+      }
+
+      // Check if this text already has a tag attribute
+      final style = widget.controller.document
+          .collectStyle(tagPosition, tagQuery.length + 1);
+      final hasTag = style.attributes.containsKey(Attribute.tag.key);
+      final hasCurrency = style.attributes.containsKey(Attribute.currency.key);
+
+      // If already has tag/currency attribute, don't re-apply
+      if (hasTag || hasCurrency) return;
+
+      // Search for matching tag and apply attribute
+      _applyTagIfFound(triggerChar, tagQuery, tagPosition);
+    });
+  }
+
+  /// Search for tag in the list and apply attribute if found
+  void _applyTagIfFound(String triggerChar, String tagName, int tagPosition) {
+    // Use the appropriate search callback
+    final searchCallback = triggerChar == '\$'
+        ? widget.config.dollarSearch
+        : widget.config.tagSearch;
+
+    if (searchCallback == null) return;
+
+    // Get the actual text in the document to determine the correct length
+    final plainText = widget.controller.document.toPlainText();
+
+    // Find the end of the tag text (either space, newline, or end of document)
+    var tagEndPos = tagPosition + 1 + tagName.length;
+    if (tagEndPos < plainText.length) {
+      final charAtEnd = plainText[tagEndPos];
+      if (charAtEnd != ' ' && charAtEnd != '\n') {
+        // Tag might be longer, find the actual end
+        while (tagEndPos < plainText.length &&
+            plainText[tagEndPos] != ' ' &&
+            plainText[tagEndPos] != '\n') {
+          tagEndPos++;
+        }
+      }
+    }
+
+    final actualTagLength = tagEndPos - tagPosition;
+
+    // Search for the tag (use the tag name as query for better performance)
+    searchCallback(tagName).then((tags) {
+      if (!mounted) return;
+
+      TagItem? matchingTag;
+      for (final tag in tags) {
+        if (tag.name.toLowerCase() == tagName.toLowerCase()) {
+          matchingTag = tag;
+          break;
+        }
+      }
+
+      // If no match found, try searching with empty query to get all tags
+      if (matchingTag == null) {
+        searchCallback('').then((allTags) {
+          if (!mounted) return;
+
+          TagItem? match;
+          for (final tag in allTags) {
+            if (tag.name.toLowerCase() == tagName.toLowerCase()) {
+              match = tag;
+              break;
+            }
+          }
+
+          if (match != null) {
+            _applyTagAttribute(
+                triggerChar, match, tagPosition, actualTagLength);
+            return;
+          }
+
+          // No match found: for # tags, still apply default color to typed text.
+          if (triggerChar == '#' &&
+              widget.config.defaultHashTagColor != null) {
+            _applyTagAttribute(
+              triggerChar,
+              TagItem(
+                id: '',
+                name: tagName,
+                color: widget.config.defaultHashTagColor,
+              ),
+              tagPosition,
+              actualTagLength,
+            );
+          }
+        }).catchError((error) {
+          // Silently handle errors
+        });
+        return;
+      }
+
+      _applyTagAttribute(
+          triggerChar, matchingTag, tagPosition, actualTagLength);
+    }).catchError((error) {
+      // Silently handle errors
+    });
+  }
+
+  /// Apply tag attribute to the specified range
+  void _applyTagAttribute(
+      String triggerChar, TagItem matchingTag, int tagPosition, int tagLength) {
+    final canonicalText = _buildCanonicalTagText(triggerChar, matchingTag);
+    var finalLen = tagLength;
+    final plainText = widget.controller.document.toPlainText();
+    if (tagPosition + tagLength <= plainText.length) {
+      final currentText =
+          plainText.substring(tagPosition, tagPosition + tagLength);
+      if (currentText != canonicalText) {
+        final selection = widget.controller.selection;
+        final diff = canonicalText.length - tagLength;
+        final updatedSelection = selection.copyWith(
+          baseOffset: selection.baseOffset >= tagPosition
+              ? selection.baseOffset + diff
+              : selection.baseOffset,
+          extentOffset: selection.extentOffset >= tagPosition
+              ? selection.extentOffset + diff
+              : selection.extentOffset,
+        );
+        widget.controller.replaceText(
+          tagPosition,
+          tagLength,
+          canonicalText,
+          updatedSelection,
+        );
+        finalLen = canonicalText.length;
+      }
+    }
+    if (triggerChar == '\$') {
+      widget.controller.formatText(
+        tagPosition,
+        finalLen,
+        CurrencyAttribute(value: {
+          'id': matchingTag.id,
+          'name': matchingTag.name,
+          if (matchingTag.count != null) 'count': matchingTag.count,
+          if (matchingTag.color != null) 'color': matchingTag.color,
+        }),
+      );
+    } else {
+      final color = widget.config.defaultHashTagColor;
+      widget.controller.formatText(
+        tagPosition,
+        finalLen,
+        TagAttribute(value: {
+          'id': matchingTag.id,
+          'name': matchingTag.name,
+          if (matchingTag.count != null) 'count': matchingTag.count,
+          if (color != null) 'color': color,
+        }),
+      );
+    }
+  }
+
+  void _applyDefaultHashTagColor(int tagPosition, String tagName) {
+    final color = widget.config.defaultHashTagColor;
+    if (color == null || tagName.isEmpty) return;
+
+    final length = tagName.length + 1; // include '#'
+    if (_hasHashTagAttribute(tagPosition, length, tagName, color)) return;
+
+    widget.controller.formatText(
+      tagPosition,
+      length,
+      TagAttribute(value: {
+        'name': tagName,
+        'color': color,
+      }),
+    );
+  }
+
+  bool _hasHashTagAttribute(
+      int tagPosition, int length, String tagName, String color) {
+    final style =
+        widget.controller.document.collectStyle(tagPosition, length);
+    final attr = style.attributes[Attribute.tag.key];
+    if (attr?.value is! Map) return false;
+    final map = attr!.value as Map;
+    final name = map['name']?.toString();
+    final attrColor = map['color']?.toString();
+    return name == tagName && attrColor == color;
+  }
+
+  String _buildCanonicalTagText(String triggerChar, TagItem item) {
+    if (triggerChar == '\$') {
+      final numericValue = double.tryParse(item.name);
+      if (numericValue != null) {
+        final formattedValue = numericValue.toStringAsFixed(
+            numericValue.truncateToDouble() == numericValue ? 0 : 2);
+        final parts = formattedValue.split('.');
+        final integerPart = parts[0];
+        final decimalPart = parts.length > 1 ? parts[1] : '';
+
+        String formattedInteger = '';
+        for (int i = integerPart.length - 1; i >= 0; i--) {
+          if ((integerPart.length - 1 - i) % 3 == 0 &&
+              i < integerPart.length - 1) {
+            formattedInteger = ',$formattedInteger';
+          }
+          formattedInteger = integerPart[i] + formattedInteger;
+        }
+
+        return '\$$formattedInteger${decimalPart.isNotEmpty ? '.$decimalPart' : ''}';
+      }
+      return '\$${item.name}';
+    }
+    return '#${item.name}';
+  }
+
+  String _normalizeWhitespace(String value) {
+    // Trim and collapse any runs of whitespace into a single space.
+    return value.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   @override

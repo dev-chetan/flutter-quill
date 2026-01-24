@@ -154,9 +154,8 @@ class _HomePageState extends State<HomePage> {
             child: MentionTagWrapper(
               controller: _controller,
               config: MentionTagConfig(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                  ),
+                  defaultHashTagColor: '#FF0000',
+                  decoration: BoxDecoration(color: Colors.white),
                   mentionSearch: (query) async {
                     // Example: Search for users
                     await Future.delayed(const Duration(milliseconds: 300));
@@ -204,7 +203,6 @@ class _HomePageState extends State<HomePage> {
                         id: '1',
                         name: 'flutter',
                         count: 123,
-                        color: '#2196F3',
                       ),
                       // Blue
                       TagItem(
@@ -372,7 +370,7 @@ class _HomePageState extends State<HomePage> {
                       // Green
                       TagItem(
                         id: '2',
-                        name: '100',
+                        name: '2000',
                         count: null,
                         color: '#FF9800',
                       ),
@@ -386,7 +384,7 @@ class _HomePageState extends State<HomePage> {
                       // Blue
                       TagItem(
                         id: '4',
-                        name: '250',
+                        name: '3000',
                         count: null,
                         color: '#9C27B0',
                       ),

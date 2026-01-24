@@ -11,6 +11,8 @@ class MentionTagConfig {
     required this.dollarSearch,
     this.maxHeight = 200,
     this.itemHeight = 48,
+    this.appendSpaceAfterSelection = true,
+    this.defaultHashTagColor,
     this.onMentionSelected,
     this.onTagSelected,
     this.mentionItemBuilder,
@@ -36,6 +38,14 @@ class MentionTagConfig {
 
   /// Height of each item in the overlay
   final double itemHeight;
+
+  /// Whether to append a trailing space when selecting a mention/tag.
+  /// This keeps typing natural after an item is inserted from suggestions.
+  final bool appendSpaceAfterSelection;
+
+  /// Default color for #tags when the tag item has no color.
+  /// This does not apply to $ currency tags.
+  final String? defaultHashTagColor;
 
   /// Optional callback when a mention is selected
   final void Function(MentionItem)? onMentionSelected;
