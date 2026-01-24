@@ -50,6 +50,14 @@ class _ActiveTriggerResult {
   _ActiveTriggerResult(this.trigger, this.result);
 }
 
+class _HashTagRange {
+  final int start;
+  final int length;
+  final String name;
+
+  _HashTagRange(this.start, this.length, this.name);
+}
+
 class _MentionTagWrapperState extends State<MentionTagWrapper> {
   MentionTagState? _mentionTagState;
   StreamSubscription<DocChange>? _changeSubscription;
@@ -60,6 +68,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   Timer? _tagCheckDebounceTimer;
   String _lastCheckedTagQuery = '';
   Timer? _mentionSpaceDebounceTimer;
+  bool _isApplyingHashTagColor = false;
 
   @override
   void initState() {
@@ -93,6 +102,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         _checkForMentionEditRemoval(change);
         _checkForCurrencyEditRemoval(change);
         _checkForTagTriggerDeletion(change);
+        _checkForHashTagsInChange(change);
         _checkForMentionOrTag();
       }
     });
@@ -877,6 +887,84 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // Search for matching tag and apply attribute
     _applyTagIfFound(triggerChar, tagName, triggerPos);
+  }
+
+  void _checkForHashTagsInChange(DocChange change) {
+    final color = widget.config.defaultHashTagColor;
+    if (color == null || _isApplyingHashTagColor) return;
+
+    int offset = 0;
+    final ranges = <_HashTagRange>[];
+
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        offset += op.length ?? 0;
+        continue;
+      }
+      if (op.isInsert) {
+        if (op.data is String) {
+          final text = op.data as String;
+          // Skip single-character inserts that are unlikely to be paste.
+          if (text.length > 1 || text.contains('\n')) {
+            _collectHashTags(text, offset, ranges);
+          }
+          offset += text.length;
+        } else {
+          offset += 1;
+        }
+        continue;
+      }
+      if (op.isDelete) {
+        continue;
+      }
+    }
+
+    if (ranges.isEmpty) return;
+
+    _isApplyingHashTagColor = true;
+    try {
+      for (final range in ranges) {
+        final style =
+            widget.controller.document.collectStyle(range.start, range.length);
+        if (style.attributes.containsKey(Attribute.tag.key)) {
+          continue;
+        }
+        widget.controller.formatText(
+          range.start,
+          range.length,
+          TagAttribute(value: {
+            'name': range.name,
+            'color': color,
+          }),
+        );
+      }
+    } finally {
+      _isApplyingHashTagColor = false;
+    }
+  }
+
+  void _collectHashTags(String insertedText, int baseOffset, List<_HashTagRange> ranges) {
+    if (insertedText.isEmpty) return;
+    final fullText = widget.controller.document.toPlainText();
+    for (int i = 0; i < insertedText.length; i++) {
+      if (insertedText[i] != '#') continue;
+      final globalPos = baseOffset + i;
+      if (globalPos >= fullText.length) continue;
+      if (globalPos > 0 && !_isBoundary(fullText[globalPos - 1])) {
+        continue;
+      }
+      int end = globalPos + 1;
+      while (end < fullText.length && !_isBoundary(fullText[end])) {
+        end++;
+      }
+      final name = fullText.substring(globalPos + 1, end);
+      if (name.isEmpty) continue;
+      ranges.add(_HashTagRange(globalPos, name.length + 1, name));
+    }
+  }
+
+  bool _isBoundary(String ch) {
+    return ch == ' ' || ch == '\n' || ch == '\t';
   }
 
   /// Check if typed tag name matches any tag in the list and apply color
