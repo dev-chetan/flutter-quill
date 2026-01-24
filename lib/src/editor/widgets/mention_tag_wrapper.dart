@@ -131,6 +131,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       return;
     }
 
+    // If user pressed enter right after a #tag, clear the tag style so
+    // the next line doesn't inherit the hash tag color.
+    _clearHashTagStyleOnNewline();
+
     // If user typed a mention manually (no suggestion selection), apply mention
     // attribute (and thus color) when they hit space. Supports names with spaces
     // like "@john doe ".
@@ -879,14 +883,42 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     // Only handle # tags here. $ tags are handled by _checkForDollarAfterSpace.
     if (triggerChar != '#') return;
 
-    // For # tags, apply default color even without a match.
-    if (widget.config.defaultHashTagColor != null) {
-      _applyDefaultHashTagColor(triggerPos, tagName);
+    final color = widget.config.defaultHashTagColor;
+    if (color == null) return;
+
+    // Determine if user ended the tag with a boundary (space or newline).
+    final boundaryPos = selection.baseOffset - 1;
+    final boundaryChar = plainText[boundaryPos];
+    final hasBoundary = boundaryChar == ' ' || boundaryChar == '\n';
+
+    // Apply color across the tag text only (exclude the boundary).
+    _applyDefaultHashTagColor(triggerPos, tagName);
+  }
+
+  void _clearHashTagStyleOnNewline() {
+    final selection = widget.controller.selection;
+    final plainText = widget.controller.document.toPlainText();
+    if (selection.baseOffset < 2 || plainText.isEmpty) return;
+
+    final charBefore = plainText[selection.baseOffset - 1];
+    if (charBefore != '\n') return;
+
+    final beforeNewlinePos = selection.baseOffset - 2;
+    if (beforeNewlinePos < 0) return;
+
+    final style =
+        widget.controller.document.collectStyle(beforeNewlinePos, 1);
+    if (!style.attributes.containsKey(Attribute.tag.key)) {
       return;
     }
 
-    // Search for matching tag and apply attribute
-    _applyTagIfFound(triggerChar, tagName, triggerPos);
+    // Remove tag attribute from the newline and clear toggled style.
+    widget.controller.formatText(
+      selection.baseOffset - 1,
+      1,
+      TagAttribute(value: null),
+    );
+    widget.controller.formatSelection(TagAttribute(value: null));
   }
 
   void _checkForHashTagsInChange(DocChange change) {
