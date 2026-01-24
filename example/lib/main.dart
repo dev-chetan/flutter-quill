@@ -150,6 +150,7 @@ class _HomePageState extends State<HomePage> {
               config: MentionTagConfig(
                   defaultHashTagColor: '#FF0000',
                   decoration: BoxDecoration(color: Colors.white),
+                  suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
                     // Example: Search for users
                     await Future.delayed(const Duration(milliseconds: 300));

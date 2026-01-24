@@ -22,6 +22,7 @@ class MentionTagConfig {
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
     this.loadMoreIndicatorBuilder,
+    this.suggestionListPadding = EdgeInsets.zero,
     this.decoration,
   });
 
@@ -84,6 +85,9 @@ class MentionTagConfig {
   /// Optional builder for the "load more" indicator at the bottom of the list.
   /// If not provided, a default circular progress indicator is shown.
   final Widget Function(BuildContext context, bool isMention, String tagTrigger)? loadMoreIndicatorBuilder;
+
+  /// Padding for the suggestion list content.
+  final EdgeInsetsGeometry suggestionListPadding;
 
   /// Optional decoration for the suggestion overlay view
   /// If not provided, defaults to card color with rounded corners and border

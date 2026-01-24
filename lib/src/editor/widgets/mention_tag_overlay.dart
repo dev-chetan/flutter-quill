@@ -93,6 +93,7 @@ class MentionTagOverlay extends StatefulWidget {
     this.onLoadMoreTags,
     this.onLoadMoreDollarTags,
     this.loadMoreIndicatorBuilder,
+    this.suggestionListPadding = EdgeInsets.zero,
     this.decoration,
     super.key,
   });
@@ -122,6 +123,7 @@ class MentionTagOverlay extends StatefulWidget {
           String query, List<TagItem> currentItems, int currentPage)?
       onLoadMoreDollarTags;
   final LoadMoreIndicatorBuilder? loadMoreIndicatorBuilder;
+  final EdgeInsetsGeometry suggestionListPadding;
   final BoxDecoration? decoration; // Custom decoration for the suggestion view
 
   @override
@@ -600,6 +602,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                 ? ListView.builder(
                     key: const PageStorageKey('mentions_list'),
                     controller: _scrollController,
+                    padding: widget.suggestionListPadding,
                     itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
                     shrinkWrap: true,
                     itemBuilder: (context, index) {
@@ -628,6 +631,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                 : ListView.builder(
                     key: const PageStorageKey('tags_list'),
                     controller: _scrollController,
+                    padding: widget.suggestionListPadding,
                     itemCount: _tags.length + (_isLoadingMore ? 1 : 0),
                     shrinkWrap: true,
                     itemBuilder: (context, index) {

@@ -335,6 +335,14 @@ MentionTagConfig(
 )
 ```
 
+**Suggestion List Padding:**
+
+```dart
+MentionTagConfig(
+  suggestionListPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+)
+```
+
 **Load More Callback Parameters:**
 - `query`: Current search query string
 - `currentItems`: List of items currently displayed
