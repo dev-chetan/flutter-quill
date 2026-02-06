@@ -416,16 +416,15 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       // Remove items that are no longer in results
       _mentions.removeWhere((item) => toRemove.contains(item));
 
-      // Build new list maintaining order from newResults
+      // Build new list maintaining order from newResults.
+      // Always prefer the newest data (e.g. updated colors, names, counts)
+      // instead of keeping stale items from the previous list.
       final resultList = <MentionItem>[];
       final existingIds = <String>{};
 
-      for (var newItem in newResults) {
+      for (final newItem in newResults) {
         if (existingIds.contains(newItem.id)) continue;
-
-        // Use existing item if available (preserves state), otherwise use new
-        final existingItem = oldMap[newItem.id];
-        resultList.add(existingItem ?? newItem);
+        resultList.add(newItem);
         existingIds.add(newItem.id);
       }
 
@@ -481,16 +480,15 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       // Remove items that are no longer in results
       _tags.removeWhere((item) => toRemove.contains(item));
 
-      // Build new list maintaining order from newResults
+      // Build new list maintaining order from newResults.
+      // Always prefer the newest data (e.g. updated colors, names, counts)
+      // instead of keeping stale items from the previous list.
       final resultList = <TagItem>[];
       final existingIds = <String>{};
 
-      for (var newItem in newResults) {
+      for (final newItem in newResults) {
         if (existingIds.contains(newItem.id)) continue;
-
-        // Use existing item if available (preserves state), otherwise use new
-        final existingItem = oldMap[newItem.id];
-        resultList.add(existingItem ?? newItem);
+        resultList.add(newItem);
         existingIds.add(newItem.id);
       }
 

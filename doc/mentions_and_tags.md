@@ -282,6 +282,24 @@ MentionTagConfig(
 )
 ```
 
+### Suggestion View Styling
+
+Customize the suggestion view container and list padding:
+
+```dart
+MentionTagConfig(
+  decoration: BoxDecoration(
+    color: Colors.grey.shade900,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: Colors.grey.shade700),
+  ),
+  suggestionListPadding: const EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 8,
+  ),
+)
+```
+
 ### Custom Data
 
 You can pass custom data to builders using the `customData` parameter:

@@ -343,6 +343,18 @@ MentionTagConfig(
 )
 ```
 
+**Suggestion View Decoration:**
+
+```dart
+MentionTagConfig(
+  decoration: BoxDecoration(
+    color: Colors.grey.shade900,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: Colors.grey.shade700),
+  ),
+)
+```
+
 **Load More Callback Parameters:**
 - `query`: Current search query string
 - `currentItems`: List of items currently displayed
