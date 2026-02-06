@@ -13,7 +13,7 @@ import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
 import '../widgets/mention_tag_overlay.dart';
 
-/// v1
+/// v2
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
   const MentionTagWrapper({
@@ -227,7 +227,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         _showOverlay(false, tagPosition, tagQuery, tagTrigger: '#');
       }
       // If default hash tag color is set, apply it immediately while typing.
-      if (tagQuery.isNotEmpty && widget.config.defaultHashTagColor != null) {
+      if (tagQuery.isNotEmpty) {
         _applyDefaultHashTagColor(tagPosition, tagQuery);
         return;
       }
@@ -818,7 +818,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         'id': item.id,
         'name': item.name,
         if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-        if (item.color != null) 'color': item.color,
+        'color': widget.config.defaultMentionColor,
       }),
     );
   }
@@ -923,8 +923,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   }
 
   void _checkForHashTagsInChange(DocChange change) {
+    if (_isApplyingHashTagColor) return;
     final color = widget.config.defaultHashTagColor;
-    if (color == null || _isApplyingHashTagColor) return;
 
     int offset = 0;
     final ranges = <_HashTagRange>[];
@@ -1099,15 +1099,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           }
 
           // No match found: for # tags, still apply default color to typed text.
-          if (triggerChar == '#' &&
-              widget.config.defaultHashTagColor != null) {
+          if (triggerChar == '#') {
             _applyTagAttribute(
               triggerChar,
-              TagItem(
-                id: '',
-                name: tagName,
-                color: widget.config.defaultHashTagColor,
-              ),
+              TagItem(id: '', name: tagName),
               tagPosition,
               actualTagLength,
             );
@@ -1162,11 +1157,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           'id': matchingTag.id,
           'name': matchingTag.name,
           if (matchingTag.count != null) 'count': matchingTag.count,
-          if (matchingTag.color != null) 'color': matchingTag.color,
+          'color': widget.config.defaultDollarTagColor,
         }),
       );
     } else {
-      final color = widget.config.defaultHashTagColor;
       widget.controller.formatText(
         tagPosition,
         finalLen,
@@ -1174,15 +1168,15 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           'id': matchingTag.id,
           'name': matchingTag.name,
           if (matchingTag.count != null) 'count': matchingTag.count,
-          if (color != null) 'color': color,
+          'color': widget.config.defaultHashTagColor,
         }),
       );
     }
   }
 
   void _applyDefaultHashTagColor(int tagPosition, String tagName) {
+    if (tagName.isEmpty) return;
     final color = widget.config.defaultHashTagColor;
-    if (color == null || tagName.isEmpty) return;
 
     final length = tagName.length + 1; // include '#'
     if (_hasHashTagAttribute(tagPosition, length, tagName, color)) return;

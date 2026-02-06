@@ -47,6 +47,9 @@ class MentionTagState {
       query: query,
       isMention: isMentionMode,
       tagTrigger: tagTriggerChar,
+      defaultMentionColor: config.defaultMentionColor,
+      defaultHashTagColor: config.defaultHashTagColor,
+      defaultDollarTagColor: config.defaultDollarTagColor,
       onSelectMention: _handleMentionSelected,
       onSelectTag: _handleTagSelected,
       mentionSearch: config.mentionSearch,
@@ -91,6 +94,9 @@ class MentionTagState {
           query: queryToUpdate,
           isMention: isMention,
           tagTrigger: tagTriggerChar,
+          defaultMentionColor: config.defaultMentionColor,
+          defaultHashTagColor: config.defaultHashTagColor,
+          defaultDollarTagColor: config.defaultDollarTagColor,
           onSelectMention: _handleMentionSelected,
           onSelectTag: _handleTagSelected,
           mentionSearch: config.mentionSearch,
@@ -141,6 +147,9 @@ class MentionTagState {
         query: currentQuery,
         isMention: isMention,
         tagTrigger: tagTriggerChar,
+        defaultMentionColor: config.defaultMentionColor,
+        defaultHashTagColor: config.defaultHashTagColor,
+        defaultDollarTagColor: config.defaultDollarTagColor,
         onSelectMention: _handleMentionSelected,
         onSelectTag: _handleTagSelected,
         mentionSearch: config.mentionSearch,
@@ -210,7 +219,7 @@ class MentionTagState {
           'id': item.id,
           'name': item.name,
           if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-          if (item.color != null) 'color': item.color,
+          'color': config.defaultMentionColor,
         }),
       );
 
@@ -279,11 +288,10 @@ class MentionTagState {
             'id': item.id,
             'name': item.name,
             if (item.count != null) 'count': item.count,
-            if (item.color != null) 'color': item.color,
+            'color': config.defaultDollarTagColor,
           }),
         );
       } else {
-        final color = config.defaultHashTagColor;
         controller.formatText(
           actualPosition,
           tagText.length,
@@ -291,10 +299,11 @@ class MentionTagState {
             'id': item.id,
             'name': item.name,
             if (item.count != null) 'count': item.count,
-            if (color != null) 'color': color,
+            'color': config.defaultHashTagColor,
           }),
         );
       }
+
 
       config.onTagSelected?.call(item);
     });

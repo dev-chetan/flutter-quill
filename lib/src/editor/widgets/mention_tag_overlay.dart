@@ -12,13 +12,11 @@ class MentionItem { // Custom data for additional requirements
     required this.id,
     required this.name,
     this.avatarUrl,
-    this.color,
     this.customData,
   });
   final String id;
   final String name;
   final String? avatarUrl;
-  final String? color; // Color as hex string (e.g., "#FF5733") or color name
   final dynamic customData;
 }
 
@@ -29,13 +27,11 @@ class TagItem { // Custom data for additional requirements
     required this.id,
     required this.name,
     this.count,
-    this.color,
     this.customData,
   });
   final String id;
   final String name;
   final int? count;
-  final String? color; // Color as hex string (e.g., "#FF5733") or color name
   final dynamic customData;
 }
 
@@ -85,6 +81,9 @@ class MentionTagOverlay extends StatefulWidget {
     required this.dollarSearch,
     this.maxHeight = 200,
     this.tagTrigger = '#',
+    this.defaultMentionColor = '#FF0000',
+    this.defaultHashTagColor = '#FF0000',
+    this.defaultDollarTagColor = '#FF0000',
     this.onItemCountChanged,
     this.mentionItemBuilder,
     this.tagItemBuilder,
@@ -107,6 +106,12 @@ class MentionTagOverlay extends StatefulWidget {
   final TagSearchCallback dollarSearch;
   final double maxHeight;
   final String tagTrigger; // Tag trigger character (# or $)
+  /// Default color for @mentions (e.g. '#FF0000'). Required.
+  final String defaultMentionColor;
+  /// Default color for #tags (e.g. '#FF0000'). Required.
+  final String defaultHashTagColor;
+  /// Default color for $ currency tags (e.g. '#FF0000'). Required.
+  final String defaultDollarTagColor;
   final void Function(int)?
       onItemCountChanged; // Callback when item count changes
   final MentionItemBuilder?
@@ -696,7 +701,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       }
 
       // Default mention item builder
-      final mentionColor = _parseTagColor(mention.color, context);
+      final mentionColor = _parseTagColor(widget.defaultMentionColor, context);
       return InkWell(
         key: key,
         onTap: () {
@@ -774,6 +779,10 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       }
 
       // Default tag item builder
+      final defaultTagColor = widget.tagTrigger == '\$'
+          ? widget.defaultDollarTagColor
+          : widget.defaultHashTagColor;
+      final tagColor = _parseTagColor(defaultTagColor, context);
       return InkWell(
         key: key,
         onTap: () {
@@ -793,8 +802,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
               Icon(
                 Icons.tag,
                 size: 20,
-                color: _parseTagColor(tag.color, context) ??
-                    Theme.of(context).colorScheme.primary,
+                color: tagColor ?? Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -802,7 +810,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                   tag.name,
                   //_formatTagDisplay(tag.name, widget.tagTrigger),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: _parseTagColor(tag.color, context),
+                        color: tagColor,
                       ),
                   overflow: TextOverflow.ellipsis,
                 ),

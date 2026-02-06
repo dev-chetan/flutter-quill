@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' as io show Directory, File;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +21,7 @@ class MainApp extends StatelessWidget {
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: ThemeMode.system,
-      home: HomePage(),
+      home: const HomePage(),
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -38,33 +39,113 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+// ---------------------------------------------------------------------------
+// Demo data & pagination (type @ # $ in editor to see lists; scroll to load more)
+// ---------------------------------------------------------------------------
+
+const int _pageSize = 5;
+const int _searchDelayMs = 200;
+const int _loadMoreDelayMs = 400;
+
+/// Returns a page of items from [list], filtered by [query]; [page] is 0-based.
+List<T> _paginatedSearch<T>(
+  List<T> list,
+  String query,
+  int page,
+  String Function(T) getName,
+) {
+  final filtered = query.isEmpty
+      ? list
+      : list
+          .where((x) =>
+              getName(x).toLowerCase().contains(query.toLowerCase()))
+          .toList();
+  final start = page * _pageSize;
+  if (start >= filtered.length) return [];
+  return filtered.sublist(
+      start, (start + _pageSize).clamp(0, filtered.length));
+}
+
+String _hexColor(int i, {int a = 37, int b = 17, int c = 7}) {
+  final r = ((i * a % 155) + 100).toRadixString(16).padLeft(2, '0');
+  final g = ((i * b % 155) + 100).toRadixString(16).padLeft(2, '0');
+  final bl = ((i * c % 155) + 100).toRadixString(16).padLeft(2, '0');
+  return '#$r$g$bl';
+}
+
+const Widget _loadMoreIndicator = Padding(
+  padding: EdgeInsets.all(12),
+  child: Center(
+    child: SizedBox(
+      width: 24,
+      height: 24,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    ),
+  ),
+);
+
+final List<TagItem> _mainTagList = [
+  TagItem(id: '1', name: 'flutter', count: 123),
+  TagItem(id: '2', name: 'dart', count: 89),
+  TagItem(id: '3', name: 'mobile', count: 45),
+  TagItem(id: '4', name: 'development', count: 67),
+  TagItem(id: '5', name: 'widgets', count: 56),
+  TagItem(id: '6', name: 'state', count: 78),
+  TagItem(id: '7', name: 'async', count: 34),
+  TagItem(id: '8', name: 'testing', count: 91),
+  TagItem(id: '9', name: 'ui', count: 112),
+  TagItem(id: '10', name: 'api', count: 44),
+  TagItem(id: '11', name: 'database', count: 33),
+  TagItem(id: '12', name: 'navigation', count: 28),
+  TagItem(id: '13', name: 'forms', count: 65),
+  TagItem(id: '14', name: 'theme', count: 41),
+  TagItem(id: '15', name: 'responsive', count: 19),
+  TagItem(id: '16', name: 'performance', count: 52),
+  TagItem(id: '17', name: 'plugins', count: 88),
+  TagItem(id: '18', name: 'packages', count: 77),
+  TagItem(id: '19', name: 'layout', count: 36),
+  TagItem(id: '20', name: 'animations', count: 61),
+  TagItem(id: '21', name: 'gestures', count: 24),
+  TagItem(id: '22', name: 'platform', count: 43),
+  TagItem(id: '23', name: 'web', count: 95),
+  TagItem(id: '24', name: 'desktop', count: 31),
+];
+
+final List<MentionItem> _mainMentionList = List.generate(
+  50,
+  (i) => MentionItem(
+    id: '${i + 1}',
+    name: 'User ${i + 1}',
+    avatarUrl: null,
+  ),
+);
+
+final List<TagItem> _mainDollarList = List.generate(
+  50,
+  (i) => TagItem(
+    id: '${i + 1}',
+    name: 'Amount ${i + 1}',
+    count: (i + 1) * 100,
+  ),
+);
+
+Future<String?> _savePastedImageToTemp(Uint8List imageBytes) async {
+  if (kIsWeb) return null;
+  final name = 'image-file-${DateTime.now().toIso8601String()}.png';
+  final file = await io.File(path.join(io.Directory.systemTemp.path, name))
+      .writeAsBytes(imageBytes, flush: true);
+  return file.path;
+}
+
 class _HomePageState extends State<HomePage> {
-  final QuillController _controller = () {
-    return QuillController.basic(
-        config: QuillControllerConfig(
+  late final QuillController _controller = QuillController.basic(
+    config: QuillControllerConfig(
       clipboardConfig: QuillClipboardConfig(
         enableExternalRichPaste: true,
-        onImagePaste: (imageBytes) async {
-          if (kIsWeb) {
-            // Dart IO is unsupported on the web.
-            return null;
-          }
-          // Save the image somewhere and return the image URL that will be
-          // stored in the Quill Delta JSON (the document).
-          final newFileName =
-              'image-file-${DateTime.now().toIso8601String()}.png';
-          final newPath = path.join(
-            io.Directory.systemTemp.path,
-            newFileName,
-          );
-          final file = await io.File(
-            newPath,
-          ).writeAsBytes(imageBytes, flush: true);
-          return file.path;
-        },
+        onImagePaste: _savePastedImageToTemp,
       ),
-    ));
-  }();
+    ),
+  );
   final FocusNode _editorFocusNode = FocusNode();
   final ScrollController _editorScrollController = ScrollController();
 
@@ -79,7 +160,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Flutter Quill Example'),
+        title: const Text('Flutter Quill Example'),
         actions: [
           IconButton(
             icon: const Icon(Icons.output),
@@ -95,7 +176,7 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          QuillSimpleToolbar(
+          /*QuillSimpleToolbar(
             controller: _controller,
             config: QuillSimpleToolbarConfig(
               embedButtons: FlutterQuillEmbeds.toolbarButtons(),
@@ -143,359 +224,49 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-          ),
+          ),*/
           Expanded(
             child: MentionTagWrapper(
               controller: _controller,
               config: MentionTagConfig(
+                  defaultMentionColor: '#FFC0CB',
                   defaultHashTagColor: '#FF0000',
+                  defaultDollarTagColor: '#0000FF',
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
-                    // Example: Search for users
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    final allUsers = [
-                      MentionItem(
-                        id: '1',
-                        name: 'John Doe',
-                        avatarUrl: null,
-                        color: '#FF5733',
-                      ),
-                      MentionItem(
-                        id: '2',
-                        name: 'Jane Smith',
-                        avatarUrl: null,
-                        color: '#33C3F0',
-                      ),
-                      MentionItem(
-                        id: '3',
-                        name: 'Bob Johnson',
-                        avatarUrl: null,
-                        color: '#4CAF50',
-                      ),
-                      MentionItem(
-                        id: '4',
-                        name: 'Alice Williams',
-                        avatarUrl: null,
-                        color: '#FF9800',
-                      ),
-                    ];
-                    if (query.isEmpty) return allUsers;
-                    return allUsers
-                        .where(
-                          (user) => user.name.toLowerCase().contains(
-                                query.toLowerCase(),
-                              ),
-                        )
-                        .toList();
+                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    return _paginatedSearch(_mainMentionList, query, 0, (u) => u.name);
+                  },
+                  onLoadMoreMentions: (query, currentItems, currentPage) async {
+                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+
+                    var paginatedSearch = _paginatedSearch(_mainMentionList, query, currentPage + 1, (u) => u.name);
+                    List<MentionItem> temp = [];
+                    for (var action in paginatedSearch) {
+                      temp.add(MentionItem(id: action.id, name: action.name));
+                    }
+                    return temp;
+                    //return _paginatedSearch(_mainMentionList, query, currentPage + 1, (u) => u.name);
                   },
                   itemHeight: 20,
                   tagSearch: (query) async {
-                    // Example: Search for tags (#)
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    final allTags = [
-                      TagItem(
-                        id: '1',
-                        name: 'flutter',
-                        count: 123,
-                      ),
-                      // Blue
-                      TagItem(
-                        id: '2',
-                        name: 'dart',
-                        count: 89,
-                        color: '#00BCD4',
-                      ),
-                      // Cyan
-                      TagItem(
-                        id: '3',
-                        name: 'mobile',
-                        count: 45,
-                        color: '#4CAF50',
-                      ),
-                      // Green
-                      TagItem(
-                        id: '4',
-                        name: 'development',
-                        count: 67,
-                        color: '#FF9800',
-                      ),
-                      // Orange
-                      TagItem(
-                        id: '5',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '6',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '7',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '8',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '9',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '10',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '11',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '12',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '13',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '14',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '15',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '16',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '17',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '18',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '19',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '20',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '21',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '22',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '23',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      TagItem(
-                        id: '24',
-                        name: 'develop',
-                        count: 69,
-                        color: '#000000',
-                      ),
-                      // Orange
-                    ];
-                    if (query.isEmpty) return allTags;
-                    return allTags
-                        .where(
-                          (tag) => tag.name.toLowerCase().contains(
-                                query.toLowerCase(),
-                              ),
-                        )
-                        .toList();
+                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    return _paginatedSearch(_mainTagList, query, 0, (t) => t.name);
                   },
+                  onLoadMoreTags: (query, currentItems, currentPage) async {
+                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+                    return _paginatedSearch(_mainTagList, query, currentPage + 1, (t) => t.name);
+                  },
+                  loadMoreIndicatorBuilder: (context, isMention, tagTrigger) =>
+                      _loadMoreIndicator,
                   dollarSearch: (query) async {
-                    // Example: Search for currency tags ($)
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    final allCurrencyTags = [
-                      TagItem(
-                        id: '1',
-                        name: '1000',
-                        count: null,
-                        color: '#4CAF50',
-                      ),
-                      // Green
-                      TagItem(
-                        id: '2',
-                        name: '2000',
-                        count: null,
-                        color: '#FF9800',
-                      ),
-                      // Orange
-                      TagItem(
-                        id: '3',
-                        name: '5000',
-                        count: null,
-                        color: '#2196F3',
-                      ),
-                      // Blue
-                      TagItem(
-                        id: '4',
-                        name: '3000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      // Purple
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      TagItem(
-                        id: '5',
-                        name: '1000000',
-                        count: null,
-                        color: '#9C27B0',
-                      ),
-                      // Purple
-                    ];
-                    if (query.isEmpty) return allCurrencyTags;
-                    return allCurrencyTags
-                        .where(
-                          (tag) => tag.name.toLowerCase().contains(
-                                query.toLowerCase(),
-                              ),
-                        )
-                        .toList();
+                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    return _paginatedSearch(_mainDollarList, query, 0, (t) => t.name);
+                  },
+                  onLoadMoreDollarTags: (query, currentItems, currentPage) async {
+                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+                    return _paginatedSearch(_mainDollarList, query, currentPage + 1, (t) => t.name);
                   },
                   onMentionSelected: (mention) {
                     debugPrint('Mention selected: ${mention.name}');

@@ -58,6 +58,9 @@ The `MentionTagConfig` requires:
 - `tagSearch`: Async function that searches for tags based on query string
 
 Optional parameters:
+- `defaultMentionColor`: Default color for @mentions as hex string (default: `'#FF0000'`). Required (non-null).
+- `defaultHashTagColor`: Default color for #tags as hex string (default: `'#FF0000'`). Required (non-null).
+- `defaultDollarTagColor`: Default color for $ currency tags as hex string (default: `'#FF0000'`). Required (non-null).
 - `maxHeight`: Maximum height of the overlay (default: 200)
 - `itemHeight`: Height of each item in the list (default: 48)
 - `onMentionSelected`: Callback when a mention is selected
@@ -80,10 +83,11 @@ class MentionItem {
   final String id;
   final String name;
   final String? avatarUrl; // Optional avatar URL
-  final String? color; // Optional color as hex string (e.g., "#FF5733") or color name
   final dynamic customData; // Optional custom data for your requirements
 }
 ```
+
+Mention color is set globally via `MentionTagConfig.defaultMentionColor` (required, default `'#FF0000'`).
 
 ### TagItem
 
@@ -92,10 +96,11 @@ class TagItem {
   final String id;
   final String name;
   final int? count; // Optional tag count
-  final String? color; // Optional color
   final dynamic customData; // Optional custom data for your requirements
 }
 ```
+
+Tag colors are set globally: use `MentionTagConfig.defaultHashTagColor` for #tags and `MentionTagConfig.defaultDollarTagColor` for $ currency tags (both required, default `'#FF0000'`).
 
 ## Attributes
 

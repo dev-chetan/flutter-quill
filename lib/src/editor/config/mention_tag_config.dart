@@ -12,7 +12,9 @@ class MentionTagConfig {
     this.maxHeight = 200,
     this.itemHeight = 48,
     this.appendSpaceAfterSelection = true,
-    this.defaultHashTagColor,
+    this.defaultMentionColor = '#FF0000',
+    this.defaultHashTagColor = '#FF0000',
+    this.defaultDollarTagColor = '#FF0000',
     this.onMentionSelected,
     this.onTagSelected,
     this.mentionItemBuilder,
@@ -45,9 +47,14 @@ class MentionTagConfig {
   /// This keeps typing natural after an item is inserted from suggestions.
   final bool appendSpaceAfterSelection;
 
-  /// Default color for #tags when the tag item has no color.
-  /// This does not apply to $ currency tags.
-  final String? defaultHashTagColor;
+  /// Default color for @mentions (e.g. '#FF0000'). Required.
+  final String defaultMentionColor;
+
+  /// Default color for #tags (e.g. '#FF0000'). Required.
+  final String defaultHashTagColor;
+
+  /// Default color for $ currency tags (e.g. '#FF0000'). Required.
+  final String defaultDollarTagColor;
 
   /// Optional callback when a mention is selected
   final void Function(MentionItem)? onMentionSelected;

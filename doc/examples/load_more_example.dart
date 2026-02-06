@@ -33,7 +33,6 @@ class _LoadMoreExampleState extends State<LoadMoreExample> {
       id: 'tag_$index',
       name: 'tag$index',
       count: index * 10,
-      color: '#${(0x1000000 + (index * 0x123456) % 0xFFFFFF).toRadixString(16)}',
     ),
   );
 
@@ -315,7 +314,6 @@ class _ApiLoadMoreExampleState extends State<ApiLoadMoreExample> {
             id: user['id'].toString(),
             name: user['name'],
             avatarUrl: user['avatarUrl'],
-            color: user['color'],
           );
         }).toList();
 
@@ -373,7 +371,6 @@ class _ApiLoadMoreExampleState extends State<ApiLoadMoreExample> {
             id: tag['id'].toString(),
             name: tag['name'],
             count: tag['count'],
-            color: tag['color'],
           );
         }).toList();
 
