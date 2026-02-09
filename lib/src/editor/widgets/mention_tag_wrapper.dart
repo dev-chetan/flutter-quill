@@ -198,23 +198,20 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     }
 
     if (activeTrigger.trigger == '@') {
-      // We're in a mention context
       final mentionQuery = activeTrigger.result.query;
       final mentionPosition = activeTrigger.result.position;
-      // If query ends with space, treat as completion and hide overlay.
-      if (mentionQuery.endsWith(' ')) {
-        if (_isOverlayVisible && _isMention) {
-          _hideOverlay();
-        }
+      // Don't show overlay when query is only whitespace (e.g. " " after " @");
+      // allow empty query "" when user just typed @.
+      if (mentionQuery.isNotEmpty && mentionQuery.trim().isEmpty) {
+        if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
-      // If query contains a space but does not end with one, user typed past the
-      // mention (e.g. "@User 1 " then "k" -> "User 1 k"). Don't keep overlay open
-      // or call mentionSearch on every keystroke.
+      if (mentionQuery.endsWith(' ')) {
+        if (_isOverlayVisible && _isMention) _hideOverlay();
+        return;
+      }
       if (mentionQuery.contains(' ') && !mentionQuery.endsWith(' ')) {
-        if (_isOverlayVisible && _isMention) {
-          _hideOverlay();
-        }
+        if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
       if (_isOverlayVisible && _isMention) {
@@ -229,6 +226,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (activeTrigger.trigger == '#') {
       final tagQuery = activeTrigger.result.query;
       final tagPosition = activeTrigger.result.position;
+      // Don't show overlay when query is only whitespace (e.g. " " after " #").
+      if (tagQuery.isNotEmpty && tagQuery.trim().isEmpty) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') _hideOverlay();
+        return;
+      }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
         _mentionTagState?.updateQuery(tagQuery);
       } else {
@@ -248,11 +250,17 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (activeTrigger.trigger == '\$') {
       final tagQuery = activeTrigger.result.query;
       final tagPosition = activeTrigger.result.position;
-      // If query contains space but does not end with one, user typed past the tag (same as @).
+      // Don't show overlay when query is only whitespace (e.g. " " after " $").
+      if (tagQuery.isNotEmpty && tagQuery.trim().isEmpty) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
+        return;
+      }
+      if (tagQuery.endsWith(' ')) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
+        return;
+      }
       if (tagQuery.contains(' ') && !tagQuery.endsWith(' ')) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
-          _hideOverlay();
-        }
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
         return;
       }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
