@@ -201,8 +201,17 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       // We're in a mention context
       final mentionQuery = activeTrigger.result.query;
       final mentionPosition = activeTrigger.result.position;
-      // If query ends with space, treat it as completion and avoid keeping overlay open.
+      // If query ends with space, treat as completion and hide overlay.
       if (mentionQuery.endsWith(' ')) {
+        if (_isOverlayVisible && _isMention) {
+          _hideOverlay();
+        }
+        return;
+      }
+      // If query contains a space but does not end with one, user typed past the
+      // mention (e.g. "@User 1 " then "k" -> "User 1 k"). Don't keep overlay open
+      // or call mentionSearch on every keystroke.
+      if (mentionQuery.contains(' ') && !mentionQuery.endsWith(' ')) {
         if (_isOverlayVisible && _isMention) {
           _hideOverlay();
         }
@@ -216,9 +225,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       return;
     }
 
-    // Check for # tag context
+    // Check for # tag context (original # logic: color while typing)
     if (activeTrigger.trigger == '#') {
-      // We're in a # tag context
       final tagQuery = activeTrigger.result.query;
       final tagPosition = activeTrigger.result.position;
       if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
@@ -226,12 +234,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       } else {
         _showOverlay(false, tagPosition, tagQuery, tagTrigger: '#');
       }
-      // If default hash tag color is set, apply it immediately while typing.
       if (tagQuery.isNotEmpty) {
         _applyDefaultHashTagColor(tagPosition, tagQuery);
         return;
       }
-      // Otherwise, check if typed tag matches any tag in the list and apply color.
       if (tagQuery != _lastCheckedTagQuery && tagQuery.isNotEmpty) {
         _checkAndApplyTypedTag('#', tagQuery, tagPosition);
       }
@@ -240,18 +246,19 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // Check for $ tag context
     if (activeTrigger.trigger == '\$') {
-      // We're in a $ tag context
       final tagQuery = activeTrigger.result.query;
       final tagPosition = activeTrigger.result.position;
+      // If query contains space but does not end with one, user typed past the tag (same as @).
+      if (tagQuery.contains(' ') && !tagQuery.endsWith(' ')) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
+          _hideOverlay();
+        }
+        return;
+      }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
         _mentionTagState?.updateQuery(tagQuery);
       } else {
         _showOverlay(false, tagPosition, tagQuery, tagTrigger: '\$');
-      }
-      // Also check if typed tag matches any tag in the list and apply color
-      // Only check if query changed and has at least 1 character
-      if (tagQuery != _lastCheckedTagQuery && tagQuery.isNotEmpty) {
-        _checkAndApplyTypedTag('\$', tagQuery, tagPosition);
       }
       return;
     }
@@ -640,9 +647,22 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final name = _normalizeWhitespace(rawName);
     if (name.isEmpty) return;
 
+    // Only apply mention on space when the text after @ is the mention name only.
+    // Allow single word "@john " or one space in name "@User 1 ".
+    // Skip when there's extra text after (e.g. "@User 1 hello ") to avoid calling mentionSearch.
+    final words = rawName.trim().split(RegExp(r'\s+'));
+    if (words.length > 2) return;
+
     final mentionLen = mentionEnd - atPos; // include '@' + raw (with spaces)
 
-    // Debounce: if user keeps typing, we should not auto-apply.
+    // If this range is already a mention (e.g. user selected from overlay), do not
+    // schedule any search — avoids mentionSearch being called when typing after selection.
+    final style =
+        widget.controller.document.collectStyle(atPos, mentionLen);
+    if (style.attributes.containsKey(Attribute.mention.key)) return;
+
+    // Apply mention (and tag color) when user types space after @name.
+    // Debounce so we only call mentionSearch once when they finish with space.
     _mentionSpaceDebounceTimer?.cancel();
     final expectedAt = atPos;
     final expectedName = name;
@@ -715,7 +735,15 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final name = _normalizeWhitespace(raw);
     if (name.isEmpty) return;
 
+    // Only apply when the text after $ is the tag name only (at most 2 words, like @).
+    final words = raw.trim().split(RegExp(r'\s+'));
+    if (words.length > 2) return;
+
+    // If this range already has currency attribute, don't schedule search.
     final len = end - dollarPos; // include '$' + raw (with spaces)
+    final style =
+        widget.controller.document.collectStyle(dollarPos, len);
+    if (style.attributes.containsKey(Attribute.currency.key)) return;
 
     _tagCheckDebounceTimer?.cancel();
     final expectedPos = dollarPos;
@@ -763,6 +791,25 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         }
       }
 
+      // If any mention name is "typedName " + more (e.g. "User 1"), don't auto-apply
+      // on space — user may be typing the longer name. Check full list via mentionSearch('').
+      final nameLower = _normalizeWhitespace(name).toLowerCase();
+      if (match != null) {
+        // Always check full list so we see "User 1" even if mentionSearch("User") didn't return it.
+        widget.config.mentionSearch('').then((all) {
+          if (!mounted) return;
+          final hasLonger = all.any((m) {
+            final n = _normalizeWhitespace(m.name).toLowerCase();
+            return n != nameLower && n.startsWith('$nameLower ');
+          });
+          if (hasLonger) return; // Don't set color; user may be typing "User 1"
+          _applyMentionAttribute(match!, atPos, mentionLen);
+        }).catchError((_) {
+          if (mounted) _applyMentionAttribute(match!, atPos, mentionLen);
+        });
+        return;
+      }
+
       if (match == null) {
         // Fallback: ask for all and try exact match.
         widget.config.mentionSearch('').then((all) {
@@ -775,14 +822,22 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               break;
             }
           }
-          if (m2 == null) return;
-          _applyMentionAttribute(m2, atPos, mentionLen);
-        }).catchError((_) {});
+          if (m2 != null) {
+            final nameLower = _normalizeWhitespace(name).toLowerCase();
+            final hasLonger = all.any((m) {
+              final n = _normalizeWhitespace(m.name).toLowerCase();
+              return n != nameLower && n.startsWith('$nameLower ');
+            });
+            if (hasLonger) return; // Don't apply; user may be typing "User 1"
+            _applyMentionAttribute(m2, atPos, mentionLen);
+          }
+          // If not in list, don't treat as tag — leave as plain text (no color).
+        });
         return;
       }
-
-      _applyMentionAttribute(match, atPos, mentionLen);
-    }).catchError((_) {});
+    }).catchError((_) {
+      // On error, don't apply — only treat as tag when found in list.
+    });
   }
 
   void _applyMentionAttribute(MentionItem item, int atPos, int mentionLen) {
@@ -1068,38 +1123,41 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final actualTagLength = tagEndPos - tagPosition;
 
     // Search for the tag (use the tag name as query for better performance)
+    final tagNameLower = tagName.toLowerCase();
     searchCallback(tagName).then((tags) {
       if (!mounted) return;
 
       TagItem? matchingTag;
       for (final tag in tags) {
-        if (tag.name.toLowerCase() == tagName.toLowerCase()) {
+        if (tag.name.toLowerCase() == tagNameLower) {
           matchingTag = tag;
           break;
         }
       }
 
-      // If no match found, try searching with empty query to get all tags
+      // If no match found, try full list.
       if (matchingTag == null) {
         searchCallback('').then((allTags) {
           if (!mounted) return;
-
           TagItem? match;
           for (final tag in allTags) {
-            if (tag.name.toLowerCase() == tagName.toLowerCase()) {
+            if (tag.name.toLowerCase() == tagNameLower) {
               match = tag;
               break;
             }
           }
-
           if (match != null) {
-            _applyTagAttribute(
-                triggerChar, match, tagPosition, actualTagLength);
-            return;
-          }
-
-          // No match found: for # tags, still apply default color to typed text.
-          if (triggerChar == '#') {
+            if (triggerChar == '\$') {
+              _tryApplyTag(
+                triggerChar, match, tagPosition, actualTagLength,
+                tagNameLower, allTags,
+              );
+            } else {
+              _applyTagAttribute(
+                  triggerChar, match, tagPosition, actualTagLength);
+            }
+          } else if (triggerChar == '#') {
+            // #: type # then text → apply tag color even when not in list.
             _applyTagAttribute(
               triggerChar,
               TagItem(id: '', name: tagName),
@@ -1107,17 +1165,49 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               actualTagLength,
             );
           }
-        }).catchError((error) {
-          // Silently handle errors
-        });
+          // $ not in list: don't treat as tag.
+        }).catchError((_) {});
         return;
       }
 
-      _applyTagAttribute(
-          triggerChar, matchingTag, tagPosition, actualTagLength);
-    }).catchError((error) {
-      // Silently handle errors
+      // Have a match.
+      if (triggerChar == '\$') {
+        // $: check full list for longer name (same as @).
+        searchCallback('').then((allTags) {
+          if (!mounted) return;
+          _tryApplyTag(
+            triggerChar, matchingTag!, tagPosition, actualTagLength,
+            tagNameLower, allTags,
+          );
+        }).catchError((_) {
+          if (mounted) {
+            _applyTagAttribute(
+                triggerChar, matchingTag!, tagPosition, actualTagLength);
+          }
+        });
+      } else {
+        // #: apply directly (no longer-name check, original # logic).
+        _applyTagAttribute(
+            triggerChar, matchingTag!, tagPosition, actualTagLength);
+      }
+    }).catchError((_) {});
+  }
+
+  /// Apply $ tag only if no longer name exists in list (same logic as @). Not used for #.
+  void _tryApplyTag(
+    String triggerChar,
+    TagItem matchingTag,
+    int tagPosition,
+    int actualTagLength,
+    String tagNameLower,
+    List<TagItem> allTags,
+  ) {
+    final hasLonger = allTags.any((t) {
+      final n = t.name.toLowerCase();
+      return n != tagNameLower && n.startsWith('$tagNameLower ');
     });
+    if (hasLonger) return; // Don't apply; user may be typing "User 1"
+    _applyTagAttribute(triggerChar, matchingTag, tagPosition, actualTagLength);
   }
 
   /// Apply tag attribute to the specified range

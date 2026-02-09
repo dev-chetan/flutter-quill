@@ -236,11 +236,12 @@ class _HomePageState extends State<HomePage> {
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
                     await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    print("@@@@@@@@@ mentionSearch (){...}");
                     return _paginatedSearch(_mainMentionList, query, 0, (u) => u.name);
                   },
                   onLoadMoreMentions: (query, currentItems, currentPage) async {
                     await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
-
+                    print("@@@@@@@@@ onLoadMoreMentions (){...}");
                     var paginatedSearch = _paginatedSearch(_mainMentionList, query, currentPage + 1, (u) => u.name);
                     List<MentionItem> temp = [];
                     for (var action in paginatedSearch) {
@@ -252,10 +253,12 @@ class _HomePageState extends State<HomePage> {
                   itemHeight: 20,
                   tagSearch: (query) async {
                     await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    print("\$\$\$\$\$\$ tagSearch (){...}");
                     return _paginatedSearch(_mainTagList, query, 0, (t) => t.name);
                   },
                   onLoadMoreTags: (query, currentItems, currentPage) async {
                     await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+                    print("\$\$\$\$\$\$ onLoadMoreTags (){...}");
                     return _paginatedSearch(_mainTagList, query, currentPage + 1, (t) => t.name);
                   },
                   loadMoreIndicatorBuilder: (context, isMention, tagTrigger) =>
