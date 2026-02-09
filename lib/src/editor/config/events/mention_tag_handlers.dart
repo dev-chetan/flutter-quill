@@ -198,32 +198,39 @@ class MentionTagState {
 
     // Calculate how much to delete
     final deleteLength = controller.selection.baseOffset - actualPosition;
+    final mentionText = '@${item.name}';
+    final shouldAppendSpace = config.appendSpaceAfterSelection;
+    final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
+    final attribute = MentionAttribute(value: {
+      'id': item.id,
+      'name': item.name,
+      if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
+      'color': config.defaultMentionColor,
+    });
 
-    // Insert mention text with attribute after a small delay to allow animation
-    Future.delayed(const Duration(milliseconds: 100), () {
-      final mentionText = '@${item.name}';
-      final shouldAppendSpace = config.appendSpaceAfterSelection;
-      final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
+    // Insert text and apply mention attribute immediately so tag color is set
+    // before any async callback (e.g. API in onMentionSelected) can trigger rebuild.
+    Future.microtask(() {
       controller.replaceText(
         actualPosition,
         deleteLength,
         insertedText,
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
       );
-
-      // Apply mention attribute
       controller.formatText(
         actualPosition,
         mentionText.length,
-        MentionAttribute(value: {
-          'id': item.id,
-          'name': item.name,
-          if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-          'color': config.defaultMentionColor,
-        }),
+        attribute,
       );
-
       config.onMentionSelected?.call(item);
+      // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.formatText(
+          actualPosition,
+          mentionText.length,
+          attribute,
+        );
+      });
     });
   }
 
@@ -268,44 +275,37 @@ class MentionTagState {
       tagText = '$triggerChar${item.name}';
     }
 
-    // Insert tag text with attribute after a small delay to allow animation
-    Future.delayed(const Duration(milliseconds: 100), () {
-      final shouldAppendSpace = config.appendSpaceAfterSelection;
-      final insertedText = shouldAppendSpace ? '$tagText ' : tagText;
+    final shouldAppendSpace = config.appendSpaceAfterSelection;
+    final insertedText = shouldAppendSpace ? '$tagText ' : tagText;
+    final attribute = triggerChar == '\$'
+        ? CurrencyAttribute(value: {
+            'id': item.id,
+            'name': item.name,
+            if (item.count != null) 'count': item.count,
+            'color': config.defaultDollarTagColor,
+          })
+        : TagAttribute(value: {
+            'id': item.id,
+            'name': item.name,
+            if (item.count != null) 'count': item.count,
+            'color': config.defaultHashTagColor,
+          });
+
+    // Insert text and apply tag attribute immediately so tag color is set
+    // before any async callback (e.g. API in onTagSelected) can trigger rebuild.
+    Future.microtask(() {
       controller.replaceText(
         actualPosition,
         deleteLength,
         insertedText,
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
       );
-
-      // Apply tag attribute - use CurrencyAttribute for $ tags, TagAttribute for # tags
-      if (triggerChar == '\$') {
-        controller.formatText(
-          actualPosition,
-          tagText.length,
-          CurrencyAttribute(value: {
-            'id': item.id,
-            'name': item.name,
-            if (item.count != null) 'count': item.count,
-            'color': config.defaultDollarTagColor,
-          }),
-        );
-      } else {
-        controller.formatText(
-          actualPosition,
-          tagText.length,
-          TagAttribute(value: {
-            'id': item.id,
-            'name': item.name,
-            if (item.count != null) 'count': item.count,
-            'color': config.defaultHashTagColor,
-          }),
-        );
-      }
-
-
+      controller.formatText(actualPosition, tagText.length, attribute);
       config.onTagSelected?.call(item);
+      // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.formatText(actualPosition, tagText.length, attribute);
+      });
     });
   }
 

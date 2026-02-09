@@ -89,6 +89,78 @@ class MentionItem {
 
 Mention color is set globally via `MentionTagConfig.defaultMentionColor` (required, default `'#FF0000'`).
 
+### Calling a search API for mentionSearch
+
+`mentionSearch` has the signature `Future<List<MentionItem>> Function(String query)`. The editor calls it with the current query (e.g. `"j"`, `"jo"`, `"john"`, or `""` for all). Implement it by calling your backend and mapping the response to `MentionItem`:
+
+```dart
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_quill/flutter_quill.dart';
+
+// Example: GET /api/users/search?q=query
+Future<List<MentionItem>> searchMentionsFromApi(String query) async {
+  try {
+    final uri = Uri.parse('https://your-api.com/api/users/search').replace(
+      queryParameters: {'q': query, 'limit': '20'},
+    );
+    final response = await http.get(uri);
+    if (response.statusCode != 200) return [];
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = json['users'] as List<dynamic>? ?? json['data'] as List<dynamic>? ?? [];
+    return list.map((e) {
+      final m = e as Map<String, dynamic>;
+      return MentionItem(
+        id: m['id']?.toString() ?? '',
+        name: m['name']?.toString() ?? m['displayName']?.toString() ?? '',
+        avatarUrl: m['avatarUrl']?.toString(),
+      );
+    }).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+// Use in config:
+MentionTagConfig(
+  mentionSearch: searchMentionsFromApi,
+  // ...
+)
+```
+
+With **Dio** (and optional cancel for fast typing):
+
+```dart
+import 'package:dio/dio.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+
+final _dio = Dio();
+
+Future<List<MentionItem>> searchMentionsFromApi(String query) async {
+  try {
+    final response = await _dio.get(
+      '/api/users/search',
+      queryParameters: {'q': query, 'limit': 20},
+      options: Options(responseType: ResponseType.json),
+    );
+    final list = response.data['users'] as List<dynamic>? ?? [];
+    return list.map((e) {
+      final m = e as Map<String, dynamic>;
+      return MentionItem(
+        id: m['id']?.toString() ?? '',
+        name: m['name']?.toString() ?? '',
+        avatarUrl: m['avatarUrl']?.toString(),
+      );
+    }).toList();
+  } catch (_) {
+    return [];
+  }
+}
+```
+
+- **Empty query**: The editor may call `mentionSearch('')` to get an initial list or to resolve a name; your API can treat `''` as “return default/recent users” or first page.
+- **Errors**: Return an empty list `[]` on failure so the overlay shows no results instead of breaking.
+
 ### TagItem
 
 ```dart

@@ -13,7 +13,7 @@ import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
 import '../widgets/mention_tag_overlay.dart';
 
-/// v2
+/// v3
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
   const MentionTagWrapper({
