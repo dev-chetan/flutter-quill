@@ -957,6 +957,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // Apply color across the tag text only (exclude the boundary).
     _applyDefaultHashTagColor(triggerPos, tagName);
+
+    // After user finishes a #tag with space, hide the suggestion overlay.
+    if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
+      _hideOverlay();
+    }
   }
 
   void _clearHashTagStyleOnNewline() {
