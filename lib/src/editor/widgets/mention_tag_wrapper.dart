@@ -231,6 +231,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         if (_isOverlayVisible && !_isMention && _tagTrigger == '#') _hideOverlay();
         return;
       }
+      // Hide overlay when query ends with space (e.g. after selecting a tag from list).
+      if (tagQuery.endsWith(' ')) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') _hideOverlay();
+        return;
+      }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
         _mentionTagState?.updateQuery(tagQuery);
       } else {

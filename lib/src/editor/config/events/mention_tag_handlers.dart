@@ -211,13 +211,13 @@ class MentionTagState {
     // Insert text and apply mention attribute immediately so tag color is set
     // before any async callback (e.g. API in onMentionSelected) can trigger rebuild.
     Future.microtask(() {
-      controller.replaceText(
+      controller..replaceText(
         actualPosition,
         deleteLength,
         insertedText,
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
-      );
-      controller.formatText(
+      )
+      ..formatText(
         actualPosition,
         mentionText.length,
         attribute,
