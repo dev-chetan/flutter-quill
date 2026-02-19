@@ -32,6 +32,8 @@ class MentionTagConfig {
   /// Optional callback invoked when the user enters or leaves "tag typing" mode.
   /// Called with [true] when the user is typing a tag or mention (e.g. after @, #, or \$)
   /// and the suggestion overlay is active; called with [false] when they are not.
+  /// Use for UI (e.g. hide toolbar when [true]). The editor scrolls automatically so the
+  /// cursor stays above the suggestion overlay; you do not need to trigger scroll here.
   final void Function(bool isTypingTag)? onTagTypingChanged;
 
   /// Callback to search for users when @ is typed

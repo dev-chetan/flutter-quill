@@ -226,10 +226,12 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: MentionTagWrapper(
               controller: _controller,
+
               config: MentionTagConfig(
                   defaultMentionColor: '#FFC0CB',
                   defaultHashTagColor: '#FF0000',
                   defaultDollarTagColor: '#0000FF',
+
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
@@ -291,6 +293,8 @@ class _HomePageState extends State<HomePage> {
                     print('isTypingTag : $isTypingTag');
                     if (isTypingTag) {
                       // e.g. hide toolbar, show different UI
+                      // _controller.requestShowCaretOnScreen = true;
+                      // _controller.notifyListeners();
                     } else {
                       // e.g. show normal toolbar
                     }

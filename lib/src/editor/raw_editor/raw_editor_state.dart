@@ -816,6 +816,20 @@ class QuillRawEditorState extends EditorState
   }
 
   void _didChangeTextEditingValueListener() {
+    if (controller.requestShowCaretOnScreen) {
+      controller.requestShowCaretOnScreen = false;
+      _showCaretOnScreenScheduled = false; // Allow this scroll to run (may have been set by initial typing)
+      // Use bringIntoView for immediate scroll so cursor is above suggestion overlay
+      try {
+        final pos = TextPosition(
+          offset: controller.selection.extentOffset,
+          affinity: controller.selection.affinity,
+        );
+        bringIntoView(pos);
+      } catch (_) {}
+      _showCaretOnScreen(); // Also schedule scroll for next frame in case viewport updated
+      return;
+    }
     _didChangeTextEditingValue(controller.ignoreFocusOnTextChange);
   }
 

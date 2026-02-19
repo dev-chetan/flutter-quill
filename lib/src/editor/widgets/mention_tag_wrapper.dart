@@ -88,6 +88,10 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               _isMention = isMention;
               _tagTrigger = tagTrigger;
             });
+            if (visible) {
+              // Scroll so cursor stays above suggestion view (immediate + delayed fallback)
+              _scrollEditorToShowCaretAboveOverlay();
+            }
             // Notify only when isTypingTag changes
             if (_lastTagTypingNotified != visible) {
               _lastTagTypingNotified = visible;
@@ -375,6 +379,27 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
   void _hideOverlay() {
     _mentionTagState?.hideOverlay();
+  }
+
+  /// Delay before requesting a second scroll when overlay is shown (fallback when layout needs more time).
+  static const Duration _scrollAfterOverlayDelay = Duration(milliseconds: 200);
+
+  /// Requests the editor to scroll so the cursor stays visible above the suggestion overlay.
+  /// Called when the overlay is shown: triggers an immediate scroll request and a delayed one as fallback.
+  void _scrollEditorToShowCaretAboveOverlay() {
+    if (!mounted) return;
+    // Immediate: same as doing it in onTagTypingChanged(true) — works when overlay just became visible
+    widget.controller.requestShowCaretOnScreen = true;
+    widget.controller.notifyListeners();
+    // Delayed fallback: after layout has settled (overlay height, keyboard, etc.)
+    Future.delayed(_scrollAfterOverlayDelay, () {
+      if (!mounted) return;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.controller.requestShowCaretOnScreen = true;
+        widget.controller.notifyListeners();
+      });
+    });
   }
 
   /// Refresh the suggestion list when data changes

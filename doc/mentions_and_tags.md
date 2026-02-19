@@ -79,6 +79,8 @@ Optional parameters:
 
 Use `onTagTypingChanged` when you need to know whether the user is currently in "tag typing" mode (cursor after `@`, `#`, or `$` with the suggestion overlay active). The callback is invoked only when this state *changes* (entering or leaving), not on every keystroke.
 
+**The editor scrolls automatically** when the suggestion overlay is shown so the cursor stays visible above it. You do not need to trigger scroll inside this callback.
+
 ```dart
 MentionTagConfig(
   mentionSearch: myMentionSearch,
