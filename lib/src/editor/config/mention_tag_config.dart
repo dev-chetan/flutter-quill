@@ -26,7 +26,13 @@ class MentionTagConfig {
     this.loadMoreIndicatorBuilder,
     this.suggestionListPadding = EdgeInsets.zero,
     this.decoration,
+    this.onTagTypingChanged,
   });
+
+  /// Optional callback invoked when the user enters or leaves "tag typing" mode.
+  /// Called with [true] when the user is typing a tag or mention (e.g. after @, #, or \$)
+  /// and the suggestion overlay is active; called with [false] when they are not.
+  final void Function(bool isTypingTag)? onTagTypingChanged;
 
   /// Callback to search for users when @ is typed
   final MentionSearchCallback mentionSearch;

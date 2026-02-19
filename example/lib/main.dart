@@ -57,13 +57,11 @@ List<T> _paginatedSearch<T>(
   final filtered = query.isEmpty
       ? list
       : list
-          .where((x) =>
-              getName(x).toLowerCase().contains(query.toLowerCase()))
+          .where((x) => getName(x).toLowerCase().contains(query.toLowerCase()))
           .toList();
   final start = page * _pageSize;
   if (start >= filtered.length) return [];
-  return filtered.sublist(
-      start, (start + _pageSize).clamp(0, filtered.length));
+  return filtered.sublist(start, (start + _pageSize).clamp(0, filtered.length));
 }
 
 String _hexColor(int i, {int a = 37, int b = 17, int c = 7}) {
@@ -235,14 +233,18 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
-                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    await Future.delayed(
+                        const Duration(milliseconds: _searchDelayMs));
                     print("@@@@@@@@@ mentionSearch (){...}");
-                    return _paginatedSearch(_mainMentionList, query, 0, (u) => u.name);
+                    return _paginatedSearch(
+                        _mainMentionList, query, 0, (u) => u.name);
                   },
                   onLoadMoreMentions: (query, currentItems, currentPage) async {
-                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+                    await Future.delayed(
+                        const Duration(milliseconds: _loadMoreDelayMs));
                     print("@@@@@@@@@ onLoadMoreMentions (){...}");
-                    var paginatedSearch = _paginatedSearch(_mainMentionList, query, currentPage + 1, (u) => u.name);
+                    var paginatedSearch = _paginatedSearch(_mainMentionList,
+                        query, currentPage + 1, (u) => u.name);
                     List<MentionItem> temp = [];
                     for (var action in paginatedSearch) {
                       temp.add(MentionItem(id: action.id, name: action.name));
@@ -252,27 +254,46 @@ class _HomePageState extends State<HomePage> {
                   },
                   itemHeight: 20,
                   tagSearch: (query) async {
-                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
+                    await Future.delayed(
+                        const Duration(milliseconds: _searchDelayMs));
                     print("\$\$\$\$\$\$ tagSearch (){...}");
-                    return _paginatedSearch(_mainTagList, query, 0, (t) => t.name);
+                    return _paginatedSearch(
+                        _mainTagList, query, 0, (t) => t.name);
                   },
                   onLoadMoreTags: (query, currentItems, currentPage) async {
-                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
+                    await Future.delayed(
+                        const Duration(milliseconds: _loadMoreDelayMs));
                     print("\$\$\$\$\$\$ onLoadMoreTags (){...}");
-                    return _paginatedSearch(_mainTagList, query, currentPage + 1, (t) => t.name);
+                    return _paginatedSearch(
+                        _mainTagList, query, currentPage + 1, (t) => t.name);
                   },
                   loadMoreIndicatorBuilder: (context, isMention, tagTrigger) =>
                       _loadMoreIndicator,
                   dollarSearch: (query) async {
-                    await Future.delayed(const Duration(milliseconds: _searchDelayMs));
-                    return _paginatedSearch(_mainDollarList, query, 0, (t) => t.name);
+                    await Future.delayed(
+                        const Duration(milliseconds: _searchDelayMs));
+                    return _paginatedSearch(
+                        _mainDollarList, query, 0, (t) => t.name);
                   },
-                  onLoadMoreDollarTags: (query, currentItems, currentPage) async {
-                    await Future.delayed(const Duration(milliseconds: _loadMoreDelayMs));
-                    return _paginatedSearch(_mainDollarList, query, currentPage + 1, (t) => t.name);
+                  onLoadMoreDollarTags:
+                      (query, currentItems, currentPage) async {
+                    await Future.delayed(
+                        const Duration(milliseconds: _loadMoreDelayMs));
+                    return _paginatedSearch(
+                        _mainDollarList, query, currentPage + 1, (t) => t.name);
                   },
                   onMentionSelected: (mention) {
                     debugPrint('Mention selected: ${mention.name}');
+                  },
+                  onTagTypingChanged: (bool isTypingTag) {
+                    // true  → user is typing a tag/mention (e.g. after @, #, or $)
+                    // false → user is not in tag-typing mode
+                    print('isTypingTag : $isTypingTag');
+                    if (isTypingTag) {
+                      // e.g. hide toolbar, show different UI
+                    } else {
+                      // e.g. show normal toolbar
+                    }
                   },
                   onTagSelected: (tag) {
                     debugPrint('Tag selected: ${tag.name}');

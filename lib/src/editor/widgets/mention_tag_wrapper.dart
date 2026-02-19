@@ -63,6 +63,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   MentionTagState? _mentionTagState;
   StreamSubscription<DocChange>? _changeSubscription;
   bool _isOverlayVisible = false;
+  bool? _lastTagTypingNotified; // null until first callback
   String _currentQuery = '';
   bool _isMention = false;
   String _tagTrigger = '#';
@@ -87,6 +88,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               _isMention = isMention;
               _tagTrigger = tagTrigger;
             });
+            // Notify only when isTypingTag changes
+            if (_lastTagTypingNotified != visible) {
+              _lastTagTypingNotified = visible;
+              widget.config.onTagTypingChanged?.call(visible);
+            }
           }
         });
       },

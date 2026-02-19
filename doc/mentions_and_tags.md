@@ -73,6 +73,27 @@ Optional parameters:
 - `onLoadMoreTags`: Callback to load more tags when user scrolls to bottom (pagination)
 - `onLoadMoreDollarTags`: Callback to load more dollar tags when user scrolls to bottom (pagination)
 - `decoration`: Custom decoration for the suggestion overlay view
+- `onTagTypingChanged`: Callback invoked when the user enters or leaves "tag typing" mode. Called with `true` when the user is typing a tag or mention (e.g. after `@`, `#`, or `$`) and the suggestion overlay is active; called with `false` when they are not. Useful to show/hide UI (e.g. toolbar) based on whether the user is in tag-typing context.
+
+## Tag typing state callback (onTagTypingChanged)
+
+Use `onTagTypingChanged` when you need to know whether the user is currently in "tag typing" mode (cursor after `@`, `#`, or `$` with the suggestion overlay active). The callback is invoked only when this state *changes* (entering or leaving), not on every keystroke.
+
+```dart
+MentionTagConfig(
+  mentionSearch: myMentionSearch,
+  tagSearch: myTagSearch,
+  dollarSearch: myDollarSearch,
+  onTagTypingChanged: (bool isTypingTag) {
+    if (isTypingTag) {
+      // User is typing a tag/mention — e.g. hide toolbar, show different UI
+    } else {
+      // User is not in tag-typing mode — e.g. show normal toolbar
+    }
+  },
+  // ... other config
+)
+```
 
 ## Data Models
 
