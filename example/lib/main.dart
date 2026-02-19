@@ -228,8 +228,8 @@ class _HomePageState extends State<HomePage> {
               controller: _controller,
 
               config: MentionTagConfig(
-                  defaultMentionColor: '#FFC0CB',
-                  defaultHashTagColor: '#FF0000',
+                  defaultMentionColor: '#0000FF',
+                  defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
 
                   decoration: BoxDecoration(color: Colors.white),

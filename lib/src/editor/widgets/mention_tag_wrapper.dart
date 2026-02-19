@@ -13,7 +13,7 @@ import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
 import '../widgets/mention_tag_overlay.dart';
 
-/// v3
+/// v4
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
   const MentionTagWrapper({
@@ -72,9 +72,21 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   Timer? _mentionSpaceDebounceTimer;
   bool _isApplyingHashTagColor = false;
 
+  /// Workaround for Flutter issue where RenderUiKitView can receive pointer
+  /// events before layout (NEEDS-LAYOUT). Block pointer events to the editor
+  /// for one frame when overlay visibility changes (and on first frame) so
+  /// layout can complete. See https://github.com/flutter/flutter/issues/167849
+  bool _blockPointerEventsForLayout = true;
+
   @override
   void initState() {
     super.initState();
+    // Unblock after first layout so the editor can receive input.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _blockPointerEventsForLayout) {
+        setState(() => _blockPointerEventsForLayout = false);
+      }
+    });
     _mentionTagState = MentionTagState(
       config: widget.config,
       controller: widget.controller,
@@ -87,6 +99,9 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               _currentQuery = query;
               _isMention = isMention;
               _tagTrigger = tagTrigger;
+              // Block pointer events for one frame to avoid RenderUiKitView
+              // receiving events before layout (Flutter framework issue).
+              _blockPointerEventsForLayout = true;
             });
             if (visible) {
               // Scroll so cursor stays above suggestion view (immediate + delayed fallback)
@@ -97,6 +112,12 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
               _lastTagTypingNotified = visible;
               widget.config.onTagTypingChanged?.call(visible);
             }
+            // Unblock pointer events after next frame so layout can complete.
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _blockPointerEventsForLayout) {
+                setState(() => _blockPointerEventsForLayout = false);
+              }
+            });
           }
         });
       },
@@ -1367,8 +1388,14 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           }
         },
         child: Column(children: [
-          // Editor widget - takes available space
-          Expanded(child: widget.child),
+          // Editor widget - takes available space. IgnorePointer workaround
+          // for RenderUiKitView NEEDS-LAYOUT when overlay visibility changes.
+          Expanded(
+            child: IgnorePointer(
+              ignoring: _blockPointerEventsForLayout,
+              child: widget.child,
+            ),
+          ),
           // Show suggestion list below editor when visible with smooth animation
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
