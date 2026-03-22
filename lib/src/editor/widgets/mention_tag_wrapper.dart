@@ -13,7 +13,7 @@ import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
 import '../widgets/mention_tag_overlay.dart';
 
-/// v4
+/// v5
 /// Wrapper widget that adds mention/tag functionality to QuillEditor
 class MentionTagWrapper extends StatefulWidget {
   const MentionTagWrapper({
@@ -62,6 +62,11 @@ class _HashTagRange {
 class _MentionTagWrapperState extends State<MentionTagWrapper> {
   MentionTagState? _mentionTagState;
   StreamSubscription<DocChange>? _changeSubscription;
+
+  /// [Document] instance we attached [changes] to; must update when
+  /// [QuillController.document] is replaced (same controller, new [Document]).
+  Document? _documentListened;
+
   bool _isOverlayVisible = false;
   bool? _lastTagTypingNotified; // null until first callback
   String _currentQuery = '';
@@ -87,7 +92,19 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         setState(() => _blockPointerEventsForLayout = false);
       }
     });
-    _mentionTagState = MentionTagState(
+    _mentionTagState = _newMentionTagState();
+
+    // Set up the refresh callback if controller is provided
+    widget.mentionTagController?.setRefreshCallback(() {
+      refreshSuggestionList();
+    });
+
+    _changeSubscription = _subscribeToDocumentChanges();
+    widget.controller.addListener(_onControllerNotification);
+  }
+
+  MentionTagState _newMentionTagState() {
+    return MentionTagState(
       config: widget.config,
       controller: widget.controller,
       onVisibilityChanged: (visible, query, isMention, tagTrigger) {
@@ -122,26 +139,64 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         });
       },
     );
+  }
 
-    // Set up the refresh callback if controller is provided
-    widget.mentionTagController?.setRefreshCallback(() {
-      refreshSuggestionList();
-    });
+  /// [didUpdateWidget] cannot detect a swapped [Document] when the parent keeps
+  /// the same [QuillController]: both `oldWidget` and `widget` read the current
+  /// document from that instance. Re-subscribe whenever the controller notifies
+  /// and the [Document] identity changed (e.g. after `controller.document = ...`).
+  void _onControllerNotification() {
+    if (!mounted) return;
+    if (identical(_documentListened, widget.controller.document)) {
+      return;
+    }
+    _changeSubscription?.cancel();
+    _changeSubscription = _subscribeToDocumentChanges();
+  }
 
-    // Listen to document changes to detect @, #, and $ triggers
-    _changeSubscription = widget.controller.document.changes.listen((change) {
+  /// Subscribes to the current [Document.changes] stream.
+  ///
+  /// When [QuillController.document] is replaced (e.g. loading saved Delta JSON),
+  /// the stream instance changes; callers must re-subscribe or mention/tag
+  /// detection stops receiving events.
+  StreamSubscription<DocChange> _subscribeToDocumentChanges() {
+    _documentListened = widget.controller.document;
+    return widget.controller.document.changes.listen((change) {
       if (change.source == ChangeSource.local) {
         _checkForMentionEditRemoval(change);
         _checkForCurrencyEditRemoval(change);
         _checkForTagTriggerDeletion(change);
         _checkForHashTagsInChange(change);
-        _checkForMentionOrTag();
+        // [QuillController.replaceText] updates selection after [Document.compose]
+        // emits. Running here sees a stale caret (e.g. offset 0 after typing `#` at
+        // the start), so triggers never open the suggestion overlay.
+        scheduleMicrotask(() {
+          if (!mounted) return;
+          _checkForMentionOrTag();
+        });
       }
     });
   }
 
   @override
+  void didUpdateWidget(MentionTagWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerNotification);
+      widget.controller.addListener(_onControllerNotification);
+      _mentionTagState?.dispose();
+      _mentionTagState = _newMentionTagState();
+      widget.mentionTagController?.setRefreshCallback(() {
+        refreshSuggestionList();
+      });
+      _changeSubscription?.cancel();
+      _changeSubscription = _subscribeToDocumentChanges();
+    }
+  }
+
+  @override
   void dispose() {
+    widget.controller.removeListener(_onControllerNotification);
     _changeSubscription?.cancel();
     _tagCheckDebounceTimer?.cancel();
     _mentionSpaceDebounceTimer?.cancel();

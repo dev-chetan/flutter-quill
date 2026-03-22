@@ -154,7 +154,7 @@ MaterialApp(
     GlobalCupertinoLocalizations.delegate,
     GlobalWidgetsLocalizations.delegate,
     FlutterQuillLocalizations.delegate,
-  ]，
+  ],
 );
 ```
 
