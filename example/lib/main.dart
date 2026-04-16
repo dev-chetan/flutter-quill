@@ -230,11 +230,10 @@ class _HomePageState extends State<HomePage> {
                   defaultMentionColor: '#0000FF',
                   defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
-                  tagTextStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-
+                  tagStyle: Style.attr({
+                    Attribute.bold.key: Attribute.bold,
+                    Attribute.h3.key: Attribute.h3
+                  }),
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
@@ -304,17 +303,6 @@ class _HomePageState extends State<HomePage> {
                   },
                   onTagSelected: (tag) {
                     debugPrint('Tag selected: ${tag.name}');
-                  },
-                  tagItemBuilder: (context, item, isSelected, onTap, _) {
-                    // return Container(
-                    //     color: Colors.red, child: Text(item.name));
-                    return ListTile(
-                        //leading: Icon(Icons.tag),
-                        title: Text(item.name),
-                        trailing:
-                            item.count != null ? Text('${item.count}') : null,
-                        selected: isSelected,
-                        onTap: onTap);
                   },
                   mentionItemBuilder: (context, item, isSelected, onTap, _) {
                     // return Container(

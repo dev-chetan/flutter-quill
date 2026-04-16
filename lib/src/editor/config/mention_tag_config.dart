@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../document/style.dart';
 import '../widgets/mention_tag_overlay.dart';
 
 /// Configuration for mention and tag functionality
@@ -15,7 +16,7 @@ class MentionTagConfig {
     this.defaultMentionColor = '#FF0000',
     this.defaultHashTagColor = '#FF0000',
     this.defaultDollarTagColor = '#FF0000',
-    this.tagTextStyle,
+    this.tagStyle = const Style(),
     this.onMentionSelected,
     this.onTagSelected,
     this.mentionItemBuilder,
@@ -65,10 +66,10 @@ class MentionTagConfig {
   /// Default color for $ currency tags (e.g. '#FF0000'). Required.
   final String defaultDollarTagColor;
 
-  /// Text style used by the default tag item widget in suggestions.
+  /// Inline style applied to @mentions, #tags, and $tags inside the editor.
   ///
-  /// This only applies when [tagItemBuilder] is not provided.
-  final TextStyle? tagTextStyle;
+  /// Example: `Style.attr({Attribute.bold.key: Attribute.bold})`.
+  final Style tagStyle;
 
   /// Optional callback when a mention is selected
   final void Function(MentionItem)? onMentionSelected;

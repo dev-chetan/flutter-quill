@@ -996,6 +996,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         'color': widget.config.defaultMentionColor,
       }),
     );
+    _applyConfiguredTagStyle(atPos, finalLen);
   }
 
   /// Check if space was just typed after a tag trigger and apply tag attribute
@@ -1150,6 +1151,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
             'color': color,
           }),
         );
+        _applyConfiguredTagStyle(range.start, range.length);
       }
     } finally {
       _isApplyingHashTagColor = false;
@@ -1387,6 +1389,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         }),
       );
     }
+    _applyConfiguredTagStyle(tagPosition, finalLen);
   }
 
   void _applyDefaultHashTagColor(int tagPosition, String tagName) {
@@ -1404,6 +1407,13 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         'color': color,
       }),
     );
+    _applyConfiguredTagStyle(tagPosition, length);
+  }
+
+  void _applyConfiguredTagStyle(int start, int length) {
+    if (start < 0 || length <= 0) return;
+    if (widget.config.tagStyle.isEmpty) return;
+    widget.controller.formatTextStyle(start, length, widget.config.tagStyle);
   }
 
   bool _hasHashTagAttribute(

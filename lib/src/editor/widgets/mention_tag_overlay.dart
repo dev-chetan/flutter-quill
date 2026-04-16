@@ -84,7 +84,6 @@ class MentionTagOverlay extends StatefulWidget {
     this.defaultMentionColor = '#FF0000',
     this.defaultHashTagColor = '#FF0000',
     this.defaultDollarTagColor = '#FF0000',
-    this.tagTextStyle,
     this.onItemCountChanged,
     this.mentionItemBuilder,
     this.tagItemBuilder,
@@ -113,7 +112,6 @@ class MentionTagOverlay extends StatefulWidget {
   final String defaultHashTagColor;
   /// Default color for $ currency tags (e.g. '#FF0000'). Required.
   final String defaultDollarTagColor;
-  final TextStyle? tagTextStyle;
   final void Function(int)?
       onItemCountChanged; // Callback when item count changes
   final MentionItemBuilder?
@@ -810,11 +808,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
               Expanded(
                 child: Text(
                   tag.name,
-                  style: (widget.tagTextStyle ??
-                          Theme.of(context).textTheme.bodyLarge)
-                      ?.copyWith(
-                    color: tagColor,
-                  ),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: tagColor,
+                      ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

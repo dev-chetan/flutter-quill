@@ -50,7 +50,6 @@ class MentionTagState {
       defaultMentionColor: config.defaultMentionColor,
       defaultHashTagColor: config.defaultHashTagColor,
       defaultDollarTagColor: config.defaultDollarTagColor,
-      tagTextStyle: config.tagTextStyle,
       onSelectMention: _handleMentionSelected,
       onSelectTag: _handleTagSelected,
       mentionSearch: config.mentionSearch,
@@ -98,7 +97,6 @@ class MentionTagState {
           defaultMentionColor: config.defaultMentionColor,
           defaultHashTagColor: config.defaultHashTagColor,
           defaultDollarTagColor: config.defaultDollarTagColor,
-          tagTextStyle: config.tagTextStyle,
           onSelectMention: _handleMentionSelected,
           onSelectTag: _handleTagSelected,
           mentionSearch: config.mentionSearch,
@@ -152,7 +150,6 @@ class MentionTagState {
         defaultMentionColor: config.defaultMentionColor,
         defaultHashTagColor: config.defaultHashTagColor,
         defaultDollarTagColor: config.defaultDollarTagColor,
-        tagTextStyle: config.tagTextStyle,
         onSelectMention: _handleMentionSelected,
         onSelectTag: _handleTagSelected,
         mentionSearch: config.mentionSearch,
@@ -225,6 +222,13 @@ class MentionTagState {
         mentionText.length,
         attribute,
       );
+      if (config.tagStyle.isNotEmpty) {
+        controller.formatTextStyle(
+          actualPosition,
+          mentionText.length,
+          config.tagStyle,
+        );
+      }
       config.onMentionSelected?.call(item);
       // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -233,6 +237,13 @@ class MentionTagState {
           mentionText.length,
           attribute,
         );
+        if (config.tagStyle.isNotEmpty) {
+          controller.formatTextStyle(
+            actualPosition,
+            mentionText.length,
+            config.tagStyle,
+          );
+        }
       });
     });
   }
@@ -304,10 +315,24 @@ class MentionTagState {
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
       );
       controller.formatText(actualPosition, tagText.length, attribute);
+      if (config.tagStyle.isNotEmpty) {
+        controller.formatTextStyle(
+          actualPosition,
+          tagText.length,
+          config.tagStyle,
+        );
+      }
       config.onTagSelected?.call(item);
       // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         controller.formatText(actualPosition, tagText.length, attribute);
+        if (config.tagStyle.isNotEmpty) {
+          controller.formatTextStyle(
+            actualPosition,
+            tagText.length,
+            config.tagStyle,
+          );
+        }
       });
     });
   }
