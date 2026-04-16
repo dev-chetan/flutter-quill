@@ -15,6 +15,7 @@ class MentionTagConfig {
     this.defaultMentionColor = '#FF0000',
     this.defaultHashTagColor = '#FF0000',
     this.defaultDollarTagColor = '#FF0000',
+    this.tagTextStyle,
     this.onMentionSelected,
     this.onTagSelected,
     this.mentionItemBuilder,
@@ -63,6 +64,11 @@ class MentionTagConfig {
 
   /// Default color for $ currency tags (e.g. '#FF0000'). Required.
   final String defaultDollarTagColor;
+
+  /// Text style used by the default tag item widget in suggestions.
+  ///
+  /// This only applies when [tagItemBuilder] is not provided.
+  final TextStyle? tagTextStyle;
 
   /// Optional callback when a mention is selected
   final void Function(MentionItem)? onMentionSelected;

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added localization support for `mn` (Mongolian, Mongolia)
+- Added `tagTextStyle` to `MentionTagConfig` to customize default tag suggestion text styling.
 
 ## [11.5.0] - 2025-10-18
 

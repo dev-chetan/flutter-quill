@@ -230,6 +230,10 @@ class _HomePageState extends State<HomePage> {
                   defaultMentionColor: '#0000FF',
                   defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
+                  tagTextStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
 
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
