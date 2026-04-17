@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added localization support for `mn` (Mongolian, Mongolia)
 - Added `tagStyle` to `MentionTagConfig` to apply inline editor style to `@mention`, `#tag`, and `$tag` text.
+- Added `font-weight` inline attribute support (e.g. `600` / `w600`) so `tagStyle` can apply semi-bold text.
 
 ## [11.5.0] - 2025-10-18
 

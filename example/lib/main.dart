@@ -231,8 +231,8 @@ class _HomePageState extends State<HomePage> {
                   defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
                   tagStyle: Style.attr({
-                    Attribute.bold.key: Attribute.bold,
-                    Attribute.h3.key: Attribute.h3
+                    Attribute.fontWeight.key:
+                        const FontWeightAttribute('600'),
                   }),
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),

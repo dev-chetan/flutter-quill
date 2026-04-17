@@ -594,6 +594,14 @@ class _TextLineState extends State<TextLine> {
       res = res.merge(TextStyle(fontFamily: font.value));
     }
 
+    final fontWeight = nodeStyle.attributes[Attribute.fontWeight.key];
+    if (fontWeight?.value is String) {
+      final parsedWeight = _parseFontWeight(fontWeight!.value as String);
+      if (parsedWeight != null) {
+        res = res.merge(TextStyle(fontWeight: parsedWeight));
+      }
+    }
+
     final size = nodeStyle.attributes[Attribute.size.key];
     if (size != null && size.value != null) {
       switch (size.value) {
@@ -805,6 +813,54 @@ class _TextLineState extends State<TextLine> {
     return a.merge(b).apply(
         decoration: TextDecoration.combine(
             List.castFrom<dynamic, TextDecoration>(decorations)));
+  }
+
+  FontWeight? _parseFontWeight(String value) {
+    final normalized = value.trim().toLowerCase();
+    switch (normalized) {
+      case 'w100':
+      case '100':
+      case 'thin':
+        return FontWeight.w100;
+      case 'w200':
+      case '200':
+      case 'extra-light':
+      case 'extralight':
+        return FontWeight.w200;
+      case 'w300':
+      case '300':
+      case 'light':
+        return FontWeight.w300;
+      case 'w400':
+      case '400':
+      case 'normal':
+      case 'regular':
+        return FontWeight.w400;
+      case 'w500':
+      case '500':
+      case 'medium':
+        return FontWeight.w500;
+      case 'w600':
+      case '600':
+      case 'semi-bold':
+      case 'semibold':
+        return FontWeight.w600;
+      case 'w700':
+      case '700':
+      case 'bold':
+        return FontWeight.w700;
+      case 'w800':
+      case '800':
+      case 'extra-bold':
+      case 'extrabold':
+        return FontWeight.w800;
+      case 'w900':
+      case '900':
+      case 'black':
+        return FontWeight.w900;
+      default:
+        return null;
+    }
   }
 }
 

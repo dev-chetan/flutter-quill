@@ -36,6 +36,7 @@ class Attribute<T> {
     Attribute.strikeThrough.key: Attribute.strikeThrough,
     Attribute.inlineCode.key: Attribute.inlineCode,
     Attribute.font.key: Attribute.font,
+    Attribute.fontWeight.key: Attribute.fontWeight,
     Attribute.size.key: Attribute.size,
     Attribute.link.key: Attribute.link,
     Attribute.color.key: Attribute.color,
@@ -80,6 +81,8 @@ class Attribute<T> {
   static const InlineCodeAttribute inlineCode = InlineCodeAttribute();
 
   static const FontAttribute font = FontAttribute(null);
+
+  static const FontWeightAttribute fontWeight = FontWeightAttribute(null);
 
   static const SizeAttribute size = SizeAttribute(null);
 
@@ -142,6 +145,7 @@ class Attribute<T> {
     Attribute.background.key,
     Attribute.placeholder.key,
     Attribute.font.key,
+    Attribute.fontWeight.key,
     Attribute.size.key,
     Attribute.inlineCode.key,
     Attribute.mention.key,
@@ -332,6 +336,11 @@ class InlineCodeAttribute extends Attribute<bool> {
 
 class FontAttribute extends Attribute<String?> {
   const FontAttribute(String? val) : super('font', AttributeScope.inline, val);
+}
+
+class FontWeightAttribute extends Attribute<String?> {
+  const FontWeightAttribute(String? val)
+      : super('font-weight', AttributeScope.inline, val);
 }
 
 class SizeAttribute extends Attribute<String?> {
