@@ -285,6 +285,43 @@ void main() {
             ..insert('X', <String, dynamic>{'link': 'linkURL', 'bold': true}),
           reason: 'Insertion within link label updates label');
     });
+
+    test('Do not carry inline style after currency tag boundary', () {
+      final currencyAttrs = <String, dynamic>{
+        'currency': {'id': '1', 'name': 'account1', 'color': '#FF0000'},
+        'font-weight': '600',
+      };
+      final delta = Delta()
+        ..insert('\$account1', currencyAttrs)
+        ..insert(' ', currencyAttrs)
+        ..insert('\n');
+      final document = Document.fromDelta(delta);
+
+      expect(
+        rule.apply(document, 10, data: 'X', len: 0),
+        null,
+        reason:
+            'Typing after selected \$tag should not inherit bold/tag style.',
+      );
+    });
+
+    test('Keep currency attributes when editing inside currency tag', () {
+      final currencyAttrs = <String, dynamic>{
+        'currency': {'id': '1', 'name': 'account1', 'color': '#FF0000'},
+        'font-weight': '600',
+      };
+      final delta = Delta()
+        ..insert('\$account1', currencyAttrs)
+        ..insert(' \n');
+      final document = Document.fromDelta(delta);
+
+      expect(
+        rule.apply(document, 5, data: 'X', len: 0),
+        Delta()
+          ..retain(5)
+          ..insert('X', currencyAttrs),
+      );
+    });
   });
 
   group('AutoFormatMultipleLinksRule', () {

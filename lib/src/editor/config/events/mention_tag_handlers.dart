@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../controller/quill_controller.dart';
 import '../../../document/attribute.dart';
+import '../../../document/style.dart';
 import '../../widgets/mention_tag_overlay.dart';
 import '../mention_tag_config.dart';
 
@@ -211,40 +212,33 @@ class MentionTagState {
     // Insert text and apply mention attribute immediately so tag color is set
     // before any async callback (e.g. API in onMentionSelected) can trigger rebuild.
     Future.microtask(() {
+      _resetToggledStyleSilently();
       controller..replaceText(
         actualPosition,
         deleteLength,
         insertedText,
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
+        shouldNotifyListeners: false,
       )
       ..formatText(
         actualPosition,
         mentionText.length,
         attribute,
+        shouldNotifyListeners: false,
       );
       if (config.tagStyle.isNotEmpty) {
-        controller.formatTextStyle(
+        _applyInlineStyleWithoutNotify(
           actualPosition,
           mentionText.length,
           config.tagStyle,
         );
       }
+      if (shouldAppendSpace) {
+        _clearTagStyleFromTrailingSpace(actualPosition + mentionText.length);
+      }
+      _resetToggledStyleSilently();
+      controller.notifyListeners();
       config.onMentionSelected?.call(item);
-      // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        controller.formatText(
-          actualPosition,
-          mentionText.length,
-          attribute,
-        );
-        if (config.tagStyle.isNotEmpty) {
-          controller.formatTextStyle(
-            actualPosition,
-            mentionText.length,
-            config.tagStyle,
-          );
-        }
-      });
     });
   }
 
@@ -308,33 +302,62 @@ class MentionTagState {
     // Insert text and apply tag attribute immediately so tag color is set
     // before any async callback (e.g. API in onTagSelected) can trigger rebuild.
     Future.microtask(() {
+      _resetToggledStyleSilently();
       controller.replaceText(
         actualPosition,
         deleteLength,
         insertedText,
         TextSelection.collapsed(offset: actualPosition + insertedText.length),
+        shouldNotifyListeners: false,
       );
-      controller.formatText(actualPosition, tagText.length, attribute);
+      controller.formatText(
+        actualPosition,
+        tagText.length,
+        attribute,
+        shouldNotifyListeners: false,
+      );
       if (config.tagStyle.isNotEmpty) {
-        controller.formatTextStyle(
+        _applyInlineStyleWithoutNotify(
           actualPosition,
           tagText.length,
           config.tagStyle,
         );
       }
+      if (shouldAppendSpace) {
+        _clearTagStyleFromTrailingSpace(actualPosition + tagText.length);
+      }
+      _resetToggledStyleSilently();
+      controller.notifyListeners();
       config.onTagSelected?.call(item);
-      // Re-apply format after callback so color is not lost if callback triggers setState/rebuild.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        controller.formatText(actualPosition, tagText.length, attribute);
-        if (config.tagStyle.isNotEmpty) {
-          controller.formatTextStyle(
-            actualPosition,
-            tagText.length,
-            config.tagStyle,
-          );
-        }
-      });
     });
+  }
+
+  void _resetToggledStyleSilently() {
+    controller.toggledStyle = Style();
+  }
+
+  void _applyInlineStyleWithoutNotify(int offset, int length, Style style) {
+    for (final attr in style.values) {
+      if (!attr.isInline) continue;
+      controller.formatText(
+        offset,
+        length,
+        attr,
+        shouldNotifyListeners: false,
+      );
+    }
+  }
+
+  void _clearTagStyleFromTrailingSpace(int offset) {
+    for (final attr in config.tagStyle.values) {
+      if (!attr.isInline) continue;
+      controller.formatText(
+        offset,
+        1,
+        Attribute.clone(attr, null),
+        shouldNotifyListeners: false,
+      );
+    }
   }
 
   bool handleKeyEvent(KeyEvent event) {

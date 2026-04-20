@@ -684,12 +684,15 @@ class PreserveInlineStylesRule extends InsertRule {
     // 3. currOp is a word boundary (space/newline) - definitely outside
     // 4. currOp has a different tag/mention/currency value - different tag/mention/currency
     // Otherwise, preserve it (handles editing within tag/mention/currency)
+    var movedOutOfSpecialToken = false;
+
     if (prevHasTag) {
       final shouldExclude = prevIsWordBoundary || 
           currIsWordBoundary || 
           (currHasTag && !_attributesEqual(prevTagAttr, currTagAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.tag.key);
+        movedOutOfSpecialToken = true;
       }
       // Otherwise preserve the tag (editing within the tag)
     } else {
@@ -702,6 +705,7 @@ class PreserveInlineStylesRule extends InsertRule {
           (currHasMention && !_attributesEqual(prevMentionAttr, currMentionAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.mention.key);
+        movedOutOfSpecialToken = true;
       }
       // Otherwise preserve the mention (editing within the mention)
     } else {
@@ -714,11 +718,19 @@ class PreserveInlineStylesRule extends InsertRule {
           (currHasCurrency && !_attributesEqual(prevCurrencyAttr, currCurrencyAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.currency.key);
+        movedOutOfSpecialToken = true;
       }
       // Otherwise preserve the currency (editing within the currency)
     } else {
       // prev doesn't have currency - make sure we don't have currency attribute
       attributes.remove(Attribute.currency.key);
+    }
+
+    // When exiting a special token (tag/mention/currency), do not carry over
+    // any inline styling that may have been applied specifically to that token
+    // (e.g. fontWeight from tagStyle).
+    if (movedOutOfSpecialToken) {
+      attributes.removeWhere((key, _) => key != Attribute.link.key);
     }
     
     if (attributes.isEmpty) {
