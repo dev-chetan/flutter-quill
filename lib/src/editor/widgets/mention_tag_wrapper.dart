@@ -1414,6 +1414,35 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (start < 0 || length <= 0) return;
     if (widget.config.tagStyle.isEmpty) return;
     widget.controller.formatTextStyle(start, length, widget.config.tagStyle);
+    _clearTagInlineStyleFromCursor(start, length);
+  }
+
+  /// Prevent inline tag style (e.g. font-weight) from leaking into normal
+  /// typing when the cursor is already after the styled tag span.
+  void _clearTagInlineStyleFromCursor(int start, int length) {
+    final selection = widget.controller.selection;
+    if (!selection.isCollapsed) return;
+
+    final cursorOffset = selection.baseOffset;
+    final tagEnd = start + length;
+    if (cursorOffset < tagEnd) {
+      // Keep inline style while user edits inside the tag span.
+      return;
+    }
+
+    var clearedAny = false;
+    for (final attr in widget.config.tagStyle.attributes.values) {
+      if (!attr.isInline || attr.value == null) continue;
+      widget.controller.formatSelection(
+        Attribute.clone(attr, null),
+        shouldNotifyListeners: false,
+      );
+      clearedAny = true;
+    }
+
+    if (clearedAny) {
+      widget.controller.notifyListeners();
+    }
   }
 
   bool _hasHashTagAttribute(

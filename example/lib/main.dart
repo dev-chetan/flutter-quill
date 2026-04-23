@@ -225,14 +225,12 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: MentionTagWrapper(
               controller: _controller,
-
               config: MentionTagConfig(
                   defaultMentionColor: '#0000FF',
                   defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
                   tagStyle: Style.attr({
-                    Attribute.fontWeight.key:
-                        const FontWeightAttribute('600'),
+                    Attribute.fontWeight.key: const FontWeightAttribute('600'),
                   }),
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
@@ -386,11 +384,9 @@ class TimeStampEmbedBuilder extends EmbedBuilder {
     BuildContext context,
     EmbedContext embedContext,
   ) {
-    return Row(
-      children: [
-        const Icon(Icons.access_time_rounded),
-        Text(embedContext.node.value.data as String),
-      ],
-    );
+    return Row(children: [
+      const Icon(Icons.access_time_rounded),
+      Text(embedContext.node.value.data as String)
+    ]);
   }
 }

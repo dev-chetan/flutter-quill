@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../controller/quill_controller.dart';
 import '../../../document/attribute.dart';
@@ -28,6 +29,7 @@ class MentionTagState {
   int _itemCount = 0; // Track number of items in overlay
   Timer? _searchDebounceTimer; // Debounce timer for search
   String? _pendingQuery; // Query waiting to be applied after debounce
+  bool? _selectionGuardPreviousReadOnly;
 
 
   void showOverlay(bool isMentionMode, int position, String query,
@@ -209,23 +211,24 @@ class MentionTagState {
       'color': config.defaultMentionColor,
     });
 
-    // Insert text and apply mention attribute immediately so tag color is set
-    // before any async callback (e.g. API in onMentionSelected) can trigger rebuild.
-    Future.microtask(() {
+    _beginSelectionApplyGuard();
+    try {
+      // Apply synchronously so the next typed character cannot inherit stale style.
       _resetToggledStyleSilently();
-      controller..replaceText(
-        actualPosition,
-        deleteLength,
-        insertedText,
-        TextSelection.collapsed(offset: actualPosition + insertedText.length),
-        shouldNotifyListeners: false,
-      )
-      ..formatText(
-        actualPosition,
-        mentionText.length,
-        attribute,
-        shouldNotifyListeners: false,
-      );
+      controller
+        ..replaceText(
+          actualPosition,
+          deleteLength,
+          insertedText,
+          TextSelection.collapsed(offset: actualPosition + insertedText.length),
+          shouldNotifyListeners: false,
+        )
+        ..formatText(
+          actualPosition,
+          mentionText.length,
+          attribute,
+          shouldNotifyListeners: false,
+        );
       if (config.tagStyle.isNotEmpty) {
         _applyInlineStyleWithoutNotify(
           actualPosition,
@@ -237,9 +240,12 @@ class MentionTagState {
         _clearTagStyleFromTrailingSpace(actualPosition + mentionText.length);
       }
       _resetToggledStyleSilently();
+      _resetTypingStyleAfterSelection();
       controller.notifyListeners();
       config.onMentionSelected?.call(item);
-    });
+    } finally {
+      _endSelectionApplyGuard();
+    }
   }
 
   void _handleTagSelected(TagItem item) {
@@ -299,9 +305,9 @@ class MentionTagState {
             'color': config.defaultHashTagColor,
           });
 
-    // Insert text and apply tag attribute immediately so tag color is set
-    // before any async callback (e.g. API in onTagSelected) can trigger rebuild.
-    Future.microtask(() {
+    _beginSelectionApplyGuard();
+    try {
+      // Apply synchronously so the next typed character cannot inherit stale style.
       _resetToggledStyleSilently();
       controller.replaceText(
         actualPosition,
@@ -327,12 +333,58 @@ class MentionTagState {
         _clearTagStyleFromTrailingSpace(actualPosition + tagText.length);
       }
       _resetToggledStyleSilently();
+      _resetTypingStyleAfterSelection();
       controller.notifyListeners();
       config.onTagSelected?.call(item);
-    });
+    } finally {
+      _endSelectionApplyGuard();
+    }
   }
 
   void _resetToggledStyleSilently() {
+    controller.toggledStyle = Style();
+  }
+
+  /// Temporarily blocks user typing while we replace/format a selected token.
+  void _beginSelectionApplyGuard() {
+    if (_selectionGuardPreviousReadOnly != null) return;
+    _selectionGuardPreviousReadOnly = controller.readOnly;
+    controller.readOnly = true;
+  }
+
+  /// Re-enable typing one frame later, after style/selection settles.
+  void _endSelectionApplyGuard() {
+    final previous = _selectionGuardPreviousReadOnly;
+    if (previous == null) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      controller.readOnly = previous;
+      _selectionGuardPreviousReadOnly = null;
+      controller.notifyListeners();
+    });
+  }
+
+  /// Ensure next typed character uses default style after selecting a token.
+  void _resetTypingStyleAfterSelection() {
+    final clearByKey = <String, Attribute>{
+      Attribute.mention.key: MentionAttribute(value: null),
+      Attribute.tag.key: TagAttribute(value: null),
+      Attribute.currency.key: CurrencyAttribute(value: null),
+      Attribute.fontWeight.key: const FontWeightAttribute(null),
+    };
+
+    for (final attr in config.tagStyle.values) {
+      if (!attr.isInline || attr.value == null) continue;
+      clearByKey[attr.key] = Attribute.clone(attr, null);
+    }
+
+    for (final attr in clearByKey.values) {
+      controller.formatSelection(
+        attr,
+        shouldNotifyListeners: false,
+      );
+    }
+
+    // Keep toggled style clean for the next keyboard insert.
     controller.toggledStyle = Style();
   }
 
