@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import '../../common/utils/color.dart';
 
 /// Represents a user mention item
-class MentionItem { // Custom data for additional requirements
+class MentionItem {
+  // Custom data for additional requirements
 
   const MentionItem({
     required this.id,
@@ -21,7 +22,8 @@ class MentionItem { // Custom data for additional requirements
 }
 
 /// Represents a hashtag item
-class TagItem { // Custom data for additional requirements
+class TagItem {
+  // Custom data for additional requirements
 
   const TagItem({
     required this.id,
@@ -108,8 +110,10 @@ class MentionTagOverlay extends StatefulWidget {
   final String tagTrigger; // Tag trigger character (# or $)
   /// Default color for @mentions (e.g. '#FF0000'). Required.
   final String defaultMentionColor;
+
   /// Default color for #tags (e.g. '#FF0000'). Required.
   final String defaultHashTagColor;
+
   /// Default color for $ currency tags (e.g. '#FF0000'). Required.
   final String defaultDollarTagColor;
   final void Function(int)?
@@ -146,6 +150,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   Timer? _searchDebounceTimer;
   Timer? _loadingIndicatorTimer; // Timer to delay showing loading indicator
   String _lastSearchedQuery = '';
+  int _searchGeneration = 0;
   int _listVersion = 0; // Track list changes for animation
   final ScrollController _scrollController = ScrollController();
 
@@ -161,8 +166,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   void dispose() {
     _searchDebounceTimer?.cancel();
     _loadingIndicatorTimer?.cancel();
-    _scrollController..removeListener(_onScroll)
-    ..dispose();
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
     super.dispose();
   }
 
@@ -177,13 +183,23 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   Future<void> _loadMore() async {
     // Don't load more if already loading, no more items, or no callback provided
     if (_isLoadingMore || !_hasMoreItems) return;
+    final query = widget.query;
+    final isMentionLoad = widget.isMention;
+    final tagTrigger = widget.tagTrigger;
+
+    bool isCurrentLoad() {
+      return mounted &&
+          widget.query == query &&
+          widget.isMention == isMentionLoad &&
+          widget.tagTrigger == tagTrigger;
+    }
 
     setState(() {
       _isLoadingMore = true;
     });
 
     try {
-      if (widget.isMention) {
+      if (isMentionLoad) {
         // Handle mentions
         if (widget.onLoadMoreMentions == null) {
           if (mounted) {
@@ -196,9 +212,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         }
 
         final newItems = await widget.onLoadMoreMentions!(
-            widget.query, _mentions, _currentPage + 1);
+            query, _mentions, _currentPage + 1);
 
-        if (mounted) {
+        if (isCurrentLoad()) {
           setState(() {
             if (newItems.isEmpty) {
               _hasMoreItems = false;
@@ -221,7 +237,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         }
       } else {
         // Handle tags
-        final loadMoreCallback = widget.tagTrigger == '\$'
+        final loadMoreCallback = tagTrigger == '\$'
             ? widget.onLoadMoreDollarTags
             : widget.onLoadMoreTags;
 
@@ -235,10 +251,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           return;
         }
 
-        final newItems =
-            await loadMoreCallback(widget.query, _tags, _currentPage + 1);
+        final newItems = await loadMoreCallback(query, _tags, _currentPage + 1);
 
-        if (mounted) {
+        if (isCurrentLoad()) {
           setState(() {
             if (newItems.isEmpty) {
               _hasMoreItems = false;
@@ -261,7 +276,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (isCurrentLoad()) {
         setState(() {
           _isLoadingMore = false;
           _hasMoreItems = false; // Stop trying if error occurs
@@ -318,10 +333,22 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   Future<void> _searchWithQuery(String query) async {
     // Allow empty query to show all results when trigger is first typed
     // This enables showing all data immediately when user types #, @, or $
+    final generation = ++_searchGeneration;
+    final isMentionSearch = widget.isMention;
+    final tagTrigger = widget.tagTrigger;
+
+    bool isCurrentSearch() {
+      return mounted &&
+          generation == _searchGeneration &&
+          widget.query == query &&
+          widget.isMention == isMentionSearch &&
+          widget.tagTrigger == tagTrigger;
+    }
 
     // Reset pagination state when searching
     _currentPage = 0;
     _hasMoreItems = true;
+    _isLoadingMore = false;
 
     // Cancel any existing loading indicator timer
     _loadingIndicatorTimer?.cancel();
@@ -329,7 +356,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     // Only show loading indicator if search takes longer than 150ms
     // This prevents flickering for fast local searches
     _loadingIndicatorTimer = Timer(const Duration(milliseconds: 150), () {
-      if (mounted) {
+      if (isCurrentSearch()) {
         setState(() {
           _isLoading = true;
         });
@@ -337,47 +364,44 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     });
 
     try {
-      if (widget.isMention) {
+      if (isMentionSearch) {
         final results = await widget.mentionSearch(query);
+        if (!isCurrentSearch()) return;
         // Cancel loading indicator timer since we got results quickly
         _loadingIndicatorTimer?.cancel();
-        if (mounted) {
-          _updateMentionsList(results);
-          // Check if we should enable load more based on results
-          if (widget.onLoadMoreMentions != null && results.isNotEmpty) {
-            _hasMoreItems = true; // Assume there might be more
-          } else {
-            _hasMoreItems = false;
-          }
+        _updateMentionsList(results);
+        // Check if we should enable load more based on results
+        if (widget.onLoadMoreMentions != null && results.isNotEmpty) {
+          _hasMoreItems = true; // Assume there might be more
+        } else {
+          _hasMoreItems = false;
         }
       } else {
         // Use dollarSearch for $ tags, tagSearch for # tags
-        final results = widget.tagTrigger == '\$'
+        final results = tagTrigger == '\$'
             ? await widget.dollarSearch(query)
             : await widget.tagSearch(query);
+        if (!isCurrentSearch()) return;
         // Cancel loading indicator timer since we got results quickly
         _loadingIndicatorTimer?.cancel();
-        if (mounted) {
-          _updateTagsList(results);
-          // Check if we should enable load more based on results
-          final loadMoreCallback = widget.tagTrigger == '\$'
-              ? widget.onLoadMoreDollarTags
-              : widget.onLoadMoreTags;
-          if (loadMoreCallback != null && results.isNotEmpty) {
-            _hasMoreItems = true; // Assume there might be more
-          } else {
-            _hasMoreItems = false;
-          }
+        _updateTagsList(results);
+        // Check if we should enable load more based on results
+        final loadMoreCallback = tagTrigger == '\$'
+            ? widget.onLoadMoreDollarTags
+            : widget.onLoadMoreTags;
+        if (loadMoreCallback != null && results.isNotEmpty) {
+          _hasMoreItems = true; // Assume there might be more
+        } else {
+          _hasMoreItems = false;
         }
       }
     } catch (e) {
+      if (!isCurrentSearch()) return;
       _loadingIndicatorTimer?.cancel();
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasMoreItems = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+        _hasMoreItems = false;
+      });
     }
   }
 

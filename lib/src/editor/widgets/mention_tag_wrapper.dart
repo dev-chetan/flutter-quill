@@ -5,9 +5,9 @@ import 'package:flutter/scheduler.dart';
 
 import '../../controller/quill_controller.dart';
 import '../../document/attribute.dart';
-import '../../document/custom_attributes.dart';
 import '../../document/document.dart';
 import '../../document/structs/doc_change.dart';
+import '../../document/style.dart';
 import '../config/events/mention_tag_handlers.dart';
 import '../config/mention_tag_config.dart';
 import '../config/mention_tag_controller.dart';
@@ -72,10 +72,13 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   String _currentQuery = '';
   bool _isMention = false;
   String _tagTrigger = '#';
+  int _currentTriggerPosition = -1;
   Timer? _tagCheckDebounceTimer;
   String _lastCheckedTagQuery = '';
   Timer? _mentionSpaceDebounceTimer;
   bool _isApplyingHashTagColor = false;
+  bool _isClearingTokenStyleLeak = false;
+  final FocusNode _keyboardFocusNode = FocusNode();
 
   /// Workaround for Flutter issue where RenderUiKitView can receive pointer
   /// events before layout (NEEDS-LAYOUT). Block pointer events to the editor
@@ -94,13 +97,14 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     });
     _mentionTagState = _newMentionTagState();
 
-    // Set up the refresh callback if controller is provided
-    widget.mentionTagController?.setRefreshCallback(() {
-      refreshSuggestionList();
-    });
+    _attachMentionTagController(widget.mentionTagController);
 
     _changeSubscription = _subscribeToDocumentChanges();
     widget.controller.addListener(_onControllerNotification);
+  }
+
+  void _attachMentionTagController(MentionTagController? controller) {
+    controller?.setRefreshCallback(refreshSuggestionList);
   }
 
   MentionTagState _newMentionTagState() {
@@ -163,6 +167,9 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     _documentListened = widget.controller.document;
     return widget.controller.document.changes.listen((change) {
       if (change.source == ChangeSource.local) {
+        if (!_isClearingTokenStyleLeak) {
+          _clearTokenStyleFromInsertedText(change);
+        }
         _checkForMentionEditRemoval(change);
         _checkForCurrencyEditRemoval(change);
         _checkForTagTriggerDeletion(change);
@@ -181,16 +188,32 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   @override
   void didUpdateWidget(MentionTagWrapper oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
+    final controllerChanged = oldWidget.controller != widget.controller;
+    final configChanged = oldWidget.config != widget.config;
+
+    if (oldWidget.mentionTagController != widget.mentionTagController) {
+      oldWidget.mentionTagController?.setRefreshCallback(null);
+      _attachMentionTagController(widget.mentionTagController);
+    }
+
+    if (controllerChanged) {
       oldWidget.controller.removeListener(_onControllerNotification);
       widget.controller.addListener(_onControllerNotification);
-      _mentionTagState?.dispose();
-      _mentionTagState = _newMentionTagState();
-      widget.mentionTagController?.setRefreshCallback(() {
-        refreshSuggestionList();
-      });
       _changeSubscription?.cancel();
       _changeSubscription = _subscribeToDocumentChanges();
+    }
+
+    if (controllerChanged || configChanged) {
+      _mentionTagState?.dispose();
+      _mentionTagState = _newMentionTagState();
+      if (_isOverlayVisible) {
+        _showOverlay(
+          _isMention,
+          _currentTriggerPosition,
+          _currentQuery,
+          tagTrigger: _tagTrigger,
+        );
+      }
     }
   }
 
@@ -201,6 +224,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     _tagCheckDebounceTimer?.cancel();
     _mentionSpaceDebounceTimer?.cancel();
     _mentionTagState?.dispose();
+    widget.mentionTagController?.setRefreshCallback(null);
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -292,11 +317,12 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
-      if (mentionQuery.endsWith(' ')) {
-        if (_isOverlayVisible && _isMention) _hideOverlay();
-        return;
-      }
-      if (mentionQuery.contains(' ') && !mentionQuery.endsWith(' ')) {
+      if (mentionQuery.endsWith(' ') &&
+          _rangeContainsAttribute(
+            mentionPosition,
+            mentionQuery.length + 1,
+            Attribute.mention.key,
+          )) {
         if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
@@ -314,12 +340,16 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       final tagPosition = activeTrigger.result.position;
       // Don't show overlay when query is only whitespace (e.g. " " after " #").
       if (tagQuery.isNotEmpty && tagQuery.trim().isEmpty) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') _hideOverlay();
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
+          _hideOverlay();
+        }
         return;
       }
       // Hide overlay when query ends with space (e.g. after selecting a tag from list).
       if (tagQuery.endsWith(' ')) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') _hideOverlay();
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
+          _hideOverlay();
+        }
         return;
       }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '#') {
@@ -343,15 +373,20 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       final tagPosition = activeTrigger.result.position;
       // Don't show overlay when query is only whitespace (e.g. " " after " $").
       if (tagQuery.isNotEmpty && tagQuery.trim().isEmpty) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
+          _hideOverlay();
+        }
         return;
       }
-      if (tagQuery.endsWith(' ')) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
-        return;
-      }
-      if (tagQuery.contains(' ') && !tagQuery.endsWith(' ')) {
-        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') _hideOverlay();
+      if (tagQuery.endsWith(' ') &&
+          _rangeContainsAttribute(
+            tagPosition,
+            tagQuery.length + 1,
+            Attribute.currency.key,
+          )) {
+        if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
+          _hideOverlay();
+        }
         return;
       }
       if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
@@ -419,9 +454,9 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // Find trigger character
     while (pos >= 0 && plainText[pos] != triggerChar) {
-    // For mentions and $ tags, allow spaces in the query (names with spaces).
-    // For # tags, a space ends the query.
-    if ((triggerChar == '#' && plainText[pos] == ' ') ||
+      // For mentions and $ tags, allow spaces in the query (names with spaces).
+      // For # tags, a space ends the query.
+      if ((triggerChar == '#' && plainText[pos] == ' ') ||
           plainText[pos] == '\n') {
         return null;
       }
@@ -445,15 +480,32 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     return _TriggerQueryResult(query, pos);
   }
 
+  bool _rangeContainsAttribute(int start, int length, String attributeKey) {
+    if (start < 0 || length <= 0) return false;
+    final plainText = widget.controller.document.toPlainText();
+    if (start >= plainText.length) return false;
+    final safeLength = (start + length).clamp(0, plainText.length) - start;
+    if (safeLength <= 0) return false;
+    for (var offset = start; offset < start + safeLength; offset++) {
+      final style = widget.controller.document.collectStyle(offset, 1);
+      if (style.attributes.containsKey(attributeKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _showOverlay(bool isMention, int position, String query,
       {String? tagTrigger}) {
     if (!mounted) return;
 
+    _currentTriggerPosition = position;
     _mentionTagState?.showOverlay(isMention, position, query,
         tagTrigger: tagTrigger ?? '#');
   }
 
   void _hideOverlay() {
+    _currentTriggerPosition = -1;
     _mentionTagState?.hideOverlay();
   }
 
@@ -482,6 +534,79 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   /// Call this method when your data source has been updated
   void refreshSuggestionList() {
     _mentionTagState?.refreshList();
+  }
+
+  void _clearTokenStyleFromInsertedText(DocChange change) {
+    var afterOffset = 0;
+
+    for (final op in change.change.toList()) {
+      if (op.isRetain) {
+        afterOffset += op.length ?? 0;
+        continue;
+      }
+
+      if (op.isInsert) {
+        final insertLen = (op.data is String) ? (op.data as String).length : 1;
+        final insertPosition = afterOffset;
+        afterOffset += insertLen;
+
+        if (op.data is! String || insertLen <= 0) continue;
+        if (!_isAfterTokenBoundary(insertPosition)) continue;
+
+        _clearTokenStyleFromRange(insertPosition, insertLen);
+        continue;
+      }
+
+      if (op.isDelete) {
+        continue;
+      }
+    }
+  }
+
+  bool _isAfterTokenBoundary(int position) {
+    if (position <= 0) return false;
+    if (_positionHasTokenAttribute(position - 1)) return true;
+
+    final plainText = widget.controller.document.toPlainText();
+    if (position > plainText.length) return false;
+    final previousChar = plainText[position - 1];
+    if (previousChar != ' ' && previousChar != '\n') return false;
+
+    return position > 1 && _positionHasTokenAttribute(position - 2);
+  }
+
+  bool _positionHasTokenAttribute(int position) {
+    final plainText = widget.controller.document.toPlainText();
+    if (position < 0 || position >= plainText.length) return false;
+
+    final style = widget.controller.document.collectStyle(position, 1);
+    return style.attributes.containsKey(Attribute.mention.key) ||
+        style.attributes.containsKey(Attribute.tag.key) ||
+        style.attributes.containsKey(Attribute.currency.key);
+  }
+
+  void _clearTokenStyleFromRange(int start, int length) {
+    final attrsToClear = _tokenStyleClearAttributesForRange(start, length);
+    if (attrsToClear.isEmpty) {
+      widget.controller.toggledStyle = const Style();
+      return;
+    }
+
+    _isClearingTokenStyleLeak = true;
+    try {
+      for (final attr in attrsToClear) {
+        widget.controller.formatText(
+          start,
+          length,
+          attr,
+          shouldNotifyListeners: false,
+        );
+      }
+      widget.controller.toggledStyle = const Style();
+      widget.controller.notifyListeners();
+    } finally {
+      _isClearingTokenStyleLeak = false;
+    }
   }
 
   /// If user deletes the trigger character `@` / `#` / `$`, remove the related
@@ -629,8 +754,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       }
 
       if (op.isInsert) {
-        final insertLen =
-            (op.data is String) ? (op.data as String).length : 1;
+        final insertLen = (op.data is String) ? (op.data as String).length : 1;
         final insertPos = afterOffset;
         afterOffset += insertLen;
 
@@ -777,8 +901,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // If this range is already a mention (e.g. user selected from overlay), do not
     // schedule any search — avoids mentionSearch being called when typing after selection.
-    final style =
-        widget.controller.document.collectStyle(atPos, mentionLen);
+    final style = widget.controller.document.collectStyle(atPos, mentionLen);
     if (style.attributes.containsKey(Attribute.mention.key)) return;
 
     // Apply mention (and tag color) when user types space after @name.
@@ -829,7 +952,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (charBefore != ' ') return;
 
     // Avoid doing work repeatedly on consecutive spaces.
-    if (selection.baseOffset > 1 && plainText[selection.baseOffset - 2] == ' ') {
+    if (selection.baseOffset > 1 &&
+        plainText[selection.baseOffset - 2] == ' ') {
       return;
     }
 
@@ -861,8 +985,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
 
     // If this range already has currency attribute, don't schedule search.
     final len = end - dollarPos; // include '$' + raw (with spaces)
-    final style =
-        widget.controller.document.collectStyle(dollarPos, len);
+    final style = widget.controller.document.collectStyle(dollarPos, len);
     if (style.attributes.containsKey(Attribute.currency.key)) return;
 
     _tagCheckDebounceTimer?.cancel();
@@ -1088,8 +1211,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final beforeNewlinePos = selection.baseOffset - 2;
     if (beforeNewlinePos < 0) return;
 
-    final style =
-        widget.controller.document.collectStyle(beforeNewlinePos, 1);
+    final style = widget.controller.document.collectStyle(beforeNewlinePos, 1);
     if (!style.attributes.containsKey(Attribute.tag.key)) {
       return;
     }
@@ -1158,7 +1280,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     }
   }
 
-  void _collectHashTags(String insertedText, int baseOffset, List<_HashTagRange> ranges) {
+  void _collectHashTags(
+      String insertedText, int baseOffset, List<_HashTagRange> ranges) {
     if (insertedText.isEmpty) return;
     final fullText = widget.controller.document.toPlainText();
     for (int i = 0; i < insertedText.length; i++) {
@@ -1276,8 +1399,12 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           if (match != null) {
             if (triggerChar == '\$') {
               _tryApplyTag(
-                triggerChar, match, tagPosition, actualTagLength,
-                tagNameLower, allTags,
+                triggerChar,
+                match,
+                tagPosition,
+                actualTagLength,
+                tagNameLower,
+                allTags,
               );
             } else {
               _applyTagAttribute(
@@ -1303,8 +1430,12 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         searchCallback('').then((allTags) {
           if (!mounted) return;
           _tryApplyTag(
-            triggerChar, matchingTag!, tagPosition, actualTagLength,
-            tagNameLower, allTags,
+            triggerChar,
+            matchingTag!,
+            tagPosition,
+            actualTagLength,
+            tagNameLower,
+            allTags,
           );
         }).catchError((_) {
           if (mounted) {
@@ -1431,24 +1562,79 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     }
 
     var clearedAny = false;
-    for (final attr in widget.config.tagStyle.attributes.values) {
-      if (!attr.isInline || attr.value == null) continue;
-      widget.controller.formatSelection(
-        Attribute.clone(attr, null),
-        shouldNotifyListeners: false,
+    final previousOffset = cursorOffset - 1;
+    if (previousOffset >= tagEnd && previousOffset >= 0) {
+      final attrsToClear = _tokenStyleClearAttributesForRange(
+        previousOffset,
+        1,
       );
-      clearedAny = true;
+      for (final attr in attrsToClear) {
+        widget.controller.formatText(
+          previousOffset,
+          1,
+          attr,
+          shouldNotifyListeners: false,
+        );
+        clearedAny = true;
+      }
     }
 
+    widget.controller.toggledStyle = const Style();
     if (clearedAny) {
       widget.controller.notifyListeners();
     }
   }
 
+  Map<String, Attribute> _tokenStyleClearCandidates() {
+    final clearByKey = <String, Attribute>{
+      Attribute.mention.key: const MentionAttribute(value: null),
+      Attribute.tag.key: const TagAttribute(value: null),
+      Attribute.currency.key: const CurrencyAttribute(value: null),
+      Attribute.bold.key: Attribute.clone(Attribute.bold, null),
+      Attribute.italic.key: Attribute.clone(Attribute.italic, null),
+      Attribute.underline.key: Attribute.clone(Attribute.underline, null),
+      Attribute.strikeThrough.key:
+          Attribute.clone(Attribute.strikeThrough, null),
+      Attribute.font.key: Attribute.clone(Attribute.font, null),
+      Attribute.fontWeight.key: const FontWeightAttribute(null),
+      Attribute.size.key: Attribute.clone(Attribute.size, null),
+      Attribute.color.key: Attribute.clone(Attribute.color, null),
+      Attribute.background.key: Attribute.clone(Attribute.background, null),
+    };
+
+    for (final attr in widget.config.tagStyle.attributes.values) {
+      if (!attr.isInline || attr.value == null) continue;
+      clearByKey[attr.key] = Attribute.clone(attr, null);
+    }
+
+    return clearByKey;
+  }
+
+  List<Attribute> _tokenStyleClearAttributesForRange(int start, int length) {
+    if (start < 0 || length <= 0) return const [];
+
+    final plainText = widget.controller.document.toPlainText();
+    if (plainText.isEmpty || start >= plainText.length) return const [];
+
+    final end = (start + length).clamp(0, plainText.length);
+    final candidates = _tokenStyleClearCandidates();
+    final keysToClear = <String>{};
+
+    for (var offset = start; offset < end; offset++) {
+      final style = widget.controller.document.collectStyle(offset, 1);
+      for (final key in style.attributes.keys) {
+        if (candidates.containsKey(key)) {
+          keysToClear.add(key);
+        }
+      }
+    }
+
+    return keysToClear.map((key) => candidates[key]!).toList(growable: false);
+  }
+
   bool _hasHashTagAttribute(
       int tagPosition, int length, String tagName, String color) {
-    final style =
-        widget.controller.document.collectStyle(tagPosition, length);
+    final style = widget.controller.document.collectStyle(tagPosition, length);
     final attr = style.attributes[Attribute.tag.key];
     if (attr?.value is! Map) return false;
     final map = attr!.value as Map;
@@ -1475,7 +1661,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final overlayWidget = _mentionTagState?.overlayWidget;
 
     return KeyboardListener(
-        focusNode: FocusNode(),
+        focusNode: _keyboardFocusNode,
         onKeyEvent: (event) {
           if (_mentionTagState?.handleKeyEvent(event) == true) {
             return;

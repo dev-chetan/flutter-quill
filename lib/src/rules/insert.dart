@@ -559,6 +559,19 @@ class PreserveInlineStylesRule extends InsertRule {
     var excludeLink = false;
     Operation? currOp;
 
+    bool hasSpecialTokenAttribute(Operation? op) {
+      final attributes = op?.attributes;
+      if (attributes == null) return false;
+      return attributes.containsKey(Attribute.mention.key) ||
+          attributes.containsKey(Attribute.tag.key) ||
+          attributes.containsKey(Attribute.currency.key);
+    }
+
+    Operation? opAt(int offset) {
+      if (offset < 0) return null;
+      return DeltaIterator(documentDelta).skip(offset);
+    }
+
     /// Process simple insertions at start of line
     if (len == 0) {
       // For insertion: get character before insertion point (index - 1) and at insertion point (index)
@@ -632,7 +645,7 @@ class PreserveInlineStylesRule extends InsertRule {
     if (excludeLink) {
       attributes.remove(Attribute.link.key);
     }
-    
+
     // Check if we're editing within a tag/mention/currency or typing outside
     // We need to check both previous and current characters to determine this
     final prevTagAttr = prev?.attributes?[Attribute.tag.key];
@@ -641,7 +654,7 @@ class PreserveInlineStylesRule extends InsertRule {
     final prevHasTag = prevTagAttr != null;
     final prevHasMention = prevMentionAttr != null;
     final prevHasCurrency = prevCurrencyAttr != null;
-    
+
     // Check the current character (at insertion point) to see if it also has the same tag/mention/currency
     final currTagAttr = currOp?.attributes?[Attribute.tag.key];
     final currMentionAttr = currOp?.attributes?[Attribute.mention.key];
@@ -649,20 +662,23 @@ class PreserveInlineStylesRule extends InsertRule {
     final currHasTag = currTagAttr != null;
     final currHasMention = currMentionAttr != null;
     final currHasCurrency = currCurrencyAttr != null;
-    
+
     // Check if currOp is a word boundary (space, newline, etc.) which indicates we're outside the tag/mention/currency
-    final currIsWordBoundary = currOp?.data is String && 
+    final currIsWordBoundary = currOp?.data is String &&
         (currOp!.data as String).isNotEmpty &&
-        ((currOp.data as String)[0] == ' ' || (currOp.data as String)[0] == '\n');
-    
+        ((currOp.data as String)[0] == ' ' ||
+            (currOp.data as String)[0] == '\n');
+
     // Check if prev is a word boundary (space, newline, etc.) - if so, we're definitely outside tag/mention/currency
-    final prevIsWordBoundary = prev?.data is String && 
+    final prevIsWordBoundary = prev?.data is String &&
         (prev!.data as String).isNotEmpty &&
-        ((prev.data as String)[(prev.data as String).length - 1] == ' ' || 
-         (prev.data as String)[(prev.data as String).length - 1] == '\n');
-    
+        ((prev.data as String)[(prev.data as String).length - 1] == ' ' ||
+            (prev.data as String)[(prev.data as String).length - 1] == '\n');
+    final previousBoundaryFollowsSpecialToken =
+        prevIsWordBoundary && hasSpecialTokenAttribute(opAt(index - 2));
+
     // Helper function to compare attribute values (handles Map comparison)
-    bool _attributesEqual(dynamic attr1, dynamic attr2) {
+    bool attributesEqual(dynamic attr1, dynamic attr2) {
       if (attr1 == attr2) return true;
       if (attr1 is Map && attr2 is Map) {
         if (attr1.length != attr2.length) return false;
@@ -675,7 +691,7 @@ class PreserveInlineStylesRule extends InsertRule {
       }
       return false;
     }
-    
+
     // Only preserve tag/mention/currency attributes if we're editing WITHIN the tag/mention/currency
     // Strategy: Only preserve if prev has the tag/mention/currency, and we're not clearly outside
     // Exclude if:
@@ -687,9 +703,9 @@ class PreserveInlineStylesRule extends InsertRule {
     var movedOutOfSpecialToken = false;
 
     if (prevHasTag) {
-      final shouldExclude = prevIsWordBoundary || 
-          currIsWordBoundary || 
-          (currHasTag && !_attributesEqual(prevTagAttr, currTagAttr));
+      final shouldExclude = prevIsWordBoundary ||
+          currIsWordBoundary ||
+          (currHasTag && !attributesEqual(prevTagAttr, currTagAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.tag.key);
         movedOutOfSpecialToken = true;
@@ -700,9 +716,10 @@ class PreserveInlineStylesRule extends InsertRule {
       attributes.remove(Attribute.tag.key);
     }
     if (prevHasMention) {
-      final shouldExclude = prevIsWordBoundary || 
-          currIsWordBoundary || 
-          (currHasMention && !_attributesEqual(prevMentionAttr, currMentionAttr));
+      final shouldExclude = prevIsWordBoundary ||
+          currIsWordBoundary ||
+          (currHasMention &&
+              !attributesEqual(prevMentionAttr, currMentionAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.mention.key);
         movedOutOfSpecialToken = true;
@@ -713,9 +730,10 @@ class PreserveInlineStylesRule extends InsertRule {
       attributes.remove(Attribute.mention.key);
     }
     if (prevHasCurrency) {
-      final shouldExclude = prevIsWordBoundary || 
-          currIsWordBoundary || 
-          (currHasCurrency && !_attributesEqual(prevCurrencyAttr, currCurrencyAttr));
+      final shouldExclude = prevIsWordBoundary ||
+          currIsWordBoundary ||
+          (currHasCurrency &&
+              !attributesEqual(prevCurrencyAttr, currCurrencyAttr));
       if (shouldExclude) {
         attributes.remove(Attribute.currency.key);
         movedOutOfSpecialToken = true;
@@ -729,22 +747,17 @@ class PreserveInlineStylesRule extends InsertRule {
     // When exiting a special token (tag/mention/currency), do not carry over
     // any inline styling that may have been applied specifically to that token
     // (e.g. fontWeight from tagStyle).
-    if (movedOutOfSpecialToken) {
+    if (movedOutOfSpecialToken || previousBoundaryFollowsSpecialToken) {
       attributes.removeWhere((key, _) => key != Attribute.link.key);
     }
-    
+
     if (attributes.isEmpty) {
       return null;
     }
-    
-    // Ensure data is a String (should already be checked at the start, but double-check for safety)
-    if (data is! String) {
-      return null;
-    }
-    
+
     return Delta()
       ..retain(index + len)
-      ..insert(data as String, attributes.isEmpty ? null : attributes);
+      ..insert(data, attributes.isEmpty ? null : attributes);
   }
 }
 

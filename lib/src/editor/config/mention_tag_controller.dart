@@ -1,5 +1,5 @@
 /// Controller for managing mention/tag suggestion list refresh
-/// 
+///
 /// Use this to refresh the suggestion list when your data changes.
 /// Create an instance and pass it to MentionTagWrapper, then call
 /// [refresh] when you need to update the list.
@@ -19,7 +19,7 @@ class MentionTagController {
   /// Internal method to set the refresh callback
   /// This is called by MentionTagWrapper
   /// Making it public so MentionTagWrapper can access it
-  void setRefreshCallback(void Function() callback) {
+  void setRefreshCallback(void Function()? callback) {
     _refreshCallback = callback;
   }
 }
