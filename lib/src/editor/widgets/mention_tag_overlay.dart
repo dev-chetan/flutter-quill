@@ -576,8 +576,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     //   );
     // }
 
-    // Hide only if no items and query is empty (no trigger typed)
-    if (isEmpty && widget.query.isEmpty) {
+    // Hide when the search has no results. This avoids laying out an empty
+    // suggestion list for configs that intentionally return no items.
+    if (isEmpty) {
       return const SizedBox.shrink();
     }
 

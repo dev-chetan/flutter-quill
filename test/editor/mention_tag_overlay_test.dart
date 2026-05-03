@@ -54,4 +54,28 @@ void main() {
     expect(find.text('@AB'), findsOneWidget);
     expect(find.text('@A'), findsNothing);
   });
+
+  testWidgets('MentionTagOverlay hides when search returns no results',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: 'missing',
+            isMention: true,
+            onSelectMention: (_) {},
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [],
+            tagSearch: (_) async => const [],
+            dollarSearch: (_) async => const [],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(ListView), findsNothing);
+  });
 }

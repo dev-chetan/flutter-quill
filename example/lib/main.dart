@@ -3,10 +3,12 @@ import 'dart:io' as io show Directory, File;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
+import 'package:flutter_quill/quill_delta.dart';
 import 'package:path/path.dart' as path;
 
 void main() => runApp(const MainApp());
@@ -159,6 +161,17 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Flutter Quill Example'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.visibility),
+            tooltip: 'Read-only mention tags',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ReadOnlyMentionTagExample(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.output),
             tooltip: 'Print Delta JSON to log',
@@ -355,6 +368,157 @@ class _HomePageState extends State<HomePage> {
     _editorFocusNode.dispose();
     super.dispose();
   }
+}
+
+class ReadOnlyMentionTagExample extends StatefulWidget {
+  const ReadOnlyMentionTagExample({super.key});
+
+  @override
+  State<ReadOnlyMentionTagExample> createState() =>
+      _ReadOnlyMentionTagExampleState();
+}
+
+class _ReadOnlyMentionTagExampleState extends State<ReadOnlyMentionTagExample> {
+  late final QuillController _controller;
+  final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    final document = Document.fromDelta(
+      Delta()
+        ..insert('Read-only note with ')
+        ..insert('@User 2', {
+          Attribute.mention.key: {
+            'id': '2',
+            'name': 'User 2',
+            'color': '#0000FF',
+          },
+          Attribute.fontWeight.key: '600',
+        })
+        ..insert(', ')
+        ..insert('#flutter', {
+          Attribute.tag.key: {
+            'id': '1',
+            'name': 'flutter',
+            'color': '#0000FF',
+          },
+          Attribute.fontWeight.key: '600',
+        })
+        ..insert(', and ')
+        ..insert('\$Amount 1', {
+          Attribute.currency.key: {
+            'id': '1',
+            'name': 'Amount 1',
+            'color': '#0000FF',
+          },
+          Attribute.fontWeight.key: '600',
+        })
+        ..insert(' content.\n\nTyping and suggestions are disabled here.\n'),
+    );
+    _controller = QuillController(
+      document: document,
+      selection: const TextSelection.collapsed(offset: 0),
+      readOnly: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Read-only Mention Tags'),
+      ),
+      body: MentionTagWrapper(
+        controller: _controller,
+        config: MentionTagConfig(
+          mentionSearch: (value) async => [],
+          tagSearch: (value) async => [],
+          dollarSearch: (value) async => [],
+          defaultMentionColor: '#0000FF',
+          defaultHashTagColor: '#0000FF',
+          defaultDollarTagColor: '#0000FF',
+          tagStyle: Style.attr({
+            Attribute.fontWeight.key: const FontWeightAttribute('600'),
+          }),
+        ),
+        child: QuillEditor.basic(
+          focusNode: _focusNode,
+          scrollController: _scrollController,
+          controller: _controller,
+          config: QuillEditorConfig(
+            showCursor: false,
+            padding: const EdgeInsets.all(16),
+            customRecognizerBuilder: (attribute, leaf) {
+              final tokenDetails = _tokenDetailsFromAttribute(attribute);
+              if (tokenDetails == null) return null;
+
+              return TapGestureRecognizer()
+                ..onTap = () {
+                  _showTokenDetails(
+                    tokenDetails.type,
+                    tokenDetails.details,
+                  );
+                };
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  _ReadOnlyTokenDetails? _tokenDetailsFromAttribute(Attribute attribute) {
+    if (attribute.value is! Map) return null;
+
+    final type = switch (attribute.key) {
+      String key when key == Attribute.mention.key => 'Mention',
+      String key when key == Attribute.tag.key => 'Hashtag',
+      String key when key == Attribute.currency.key => 'Currency',
+      _ => null,
+    };
+    if (type == null) return null;
+
+    return _ReadOnlyTokenDetails(
+      type,
+      Map<String, dynamic>.from(attribute.value as Map),
+    );
+  }
+
+  void _showTokenDetails(String type, Map<String, dynamic> details) {
+    final message = details.entries
+        .map((entry) => '${entry.key}: ${entry.value}')
+        .join('\n');
+
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(type),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+}
+
+class _ReadOnlyTokenDetails {
+  const _ReadOnlyTokenDetails(this.type, this.details);
+
+  final String type;
+  final Map<String, dynamic> details;
 }
 
 class TimeStampEmbed extends Embeddable {
