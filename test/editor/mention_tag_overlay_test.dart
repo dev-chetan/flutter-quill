@@ -327,4 +327,70 @@ void main() {
 
     expect(find.text('LoadedTag'), findsOneWidget);
   });
+
+  testWidgets('MentionTagOverlay selects refreshed tag after pagination',
+      (tester) async {
+    TagItem? selectedTag;
+
+    Widget buildOverlay(String query) {
+      return MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: query,
+            isMention: false,
+            maxHeight: 96,
+            onSelectMention: (_) {},
+            onSelectTag: (item) => selectedTag = item,
+            mentionSearch: (_) async => const [],
+            tagSearch: (value) async {
+              if (value == 'new') {
+                return const [
+                  TagItem(id: 'new-1', name: 'New Result'),
+                ];
+              }
+              return const [
+                TagItem(id: '1', name: 'FirstOne'),
+                TagItem(id: '2', name: 'FirstTwo'),
+                TagItem(id: '3', name: 'FirstThree'),
+                TagItem(id: '4', name: 'FirstFour'),
+                TagItem(id: '5', name: 'FirstFive'),
+                TagItem(id: '6', name: 'FirstSix'),
+              ];
+            },
+            dollarSearch: (_) async => const [],
+            onLoadMoreTags: (_, __, ___) async => const [
+              TagItem(id: 'loaded-1', name: 'LoadedBeforeSearch'),
+            ],
+            tagItemBuilder: (_, item, __, onTap, ____) {
+              return SizedBox(
+                height: 48,
+                child: TextButton(
+                  onPressed: onTap,
+                  child: Text(item.name),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildOverlay('old'));
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.pumpWidget(buildOverlay('new'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    expect(find.text('New Result'), findsOneWidget);
+
+    await tester.tap(find.text('New Result'));
+
+    expect(selectedTag?.id, 'new-1');
+    expect(selectedTag?.name, 'New Result');
+  });
 }

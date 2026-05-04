@@ -347,6 +347,13 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     _hasMoreItems = true;
     _isLoadingMore = false;
 
+    // After load-more the list can be scrolled far down; a new search replaces
+    // items with a shorter list while keeping the old offset, which breaks taps
+    // and can spuriously fire load-more. Snap back to the top for each search.
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+
     // Cancel any existing loading indicator timer
     _loadingIndicatorTimer?.cancel();
 
