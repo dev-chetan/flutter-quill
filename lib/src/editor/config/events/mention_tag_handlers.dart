@@ -192,23 +192,16 @@ class MentionTagState {
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
-    var actualPosition = triggerPosition;
+    var actualPosition = _resolveTriggerPosition('@', plainText);
+    if (actualPosition < 0 || actualPosition >= plainText.length) return;
 
-    // Search backwards from cursor to find @
-    var searchPos = controller.selection.baseOffset - 1;
-    while (searchPos >= 0 && searchPos < plainText.length) {
-      if (plainText[searchPos] == '@') {
-        actualPosition = searchPos;
-        break;
-      }
-      if (plainText[searchPos] == ' ' || plainText[searchPos] == '\n') {
-        break;
-      }
-      searchPos--;
-    }
-
-    // Calculate how much to delete
-    final deleteLength = controller.selection.baseOffset - actualPosition;
+    // Calculate how much to delete from the stored trigger/query. This stays
+    // stable even if tapping a paginated suggestion changes editor selection.
+    final deleteLength = _queryLengthFromTrigger(
+      plainText,
+      actualPosition,
+      currentQuery,
+    );
     final mentionText = '@${item.name}';
     final shouldAppendSpace = config.appendSpaceAfterSelection;
     final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
@@ -259,28 +252,22 @@ class MentionTagState {
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
-    var actualPosition = triggerPosition;
+    var actualPosition = _resolveTriggerPosition(tagTriggerChar, plainText);
+    if (actualPosition < 0 || actualPosition >= plainText.length) return;
 
     // Search backwards from cursor to find # or $
-    var searchPos = controller.selection.baseOffset - 1;
-    String? triggerChar;
-    while (searchPos >= 0 && searchPos < plainText.length) {
-      if (plainText[searchPos] == '#' || plainText[searchPos] == '\$') {
-        actualPosition = searchPos;
-        triggerChar = plainText[searchPos];
-        break;
-      }
-      if (plainText[searchPos] == ' ' || plainText[searchPos] == '\n') {
-        break;
-      }
-      searchPos--;
-    }
+    String? triggerChar =
+        actualPosition < plainText.length ? plainText[actualPosition] : null;
 
     // Use the detected trigger character, default to # if not found
-    triggerChar ??= '#';
+    triggerChar = triggerChar == '\$' ? '\$' : '#';
 
     // Calculate how much to delete
-    final deleteLength = controller.selection.baseOffset - actualPosition;
+    final deleteLength = _queryLengthFromTrigger(
+      plainText,
+      actualPosition,
+      currentQuery,
+    );
 
     // Format tag text
     String tagText;
@@ -341,6 +328,48 @@ class MentionTagState {
 
   void _resetToggledStyleSilently() {
     controller.toggledStyle = const Style();
+  }
+
+  int _resolveTriggerPosition(String triggerChar, String plainText) {
+    if (triggerPosition >= 0 &&
+        triggerPosition < plainText.length &&
+        plainText[triggerPosition] == triggerChar) {
+      return triggerPosition;
+    }
+
+    final selectionOffset = controller.selection.baseOffset;
+    var searchPos = selectionOffset - 1;
+    while (searchPos >= 0 && searchPos < plainText.length) {
+      if (plainText[searchPos] == triggerChar) {
+        return searchPos;
+      }
+      if (plainText[searchPos] == '\n') {
+        break;
+      }
+      searchPos--;
+    }
+
+    return triggerPosition;
+  }
+
+  int _queryLengthFromTrigger(
+    String plainText,
+    int actualPosition,
+    String query,
+  ) {
+    final queryEnd = actualPosition + 1 + query.length;
+    if (actualPosition >= 0 &&
+        queryEnd <= plainText.length &&
+        plainText.substring(actualPosition + 1, queryEnd) == query) {
+      return 1 + query.length;
+    }
+
+    final selectionOffset = controller.selection.baseOffset;
+    if (selectionOffset > actualPosition) {
+      return selectionOffset - actualPosition;
+    }
+
+    return 1;
   }
 
   /// Ensure next typed character uses default style after selecting a token.
