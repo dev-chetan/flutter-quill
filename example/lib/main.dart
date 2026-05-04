@@ -430,40 +430,45 @@ class _ReadOnlyMentionTagExampleState extends State<ReadOnlyMentionTagExample> {
       appBar: AppBar(
         title: const Text('Read-only Mention Tags'),
       ),
-      body: MentionTagWrapper(
-        controller: _controller,
-        config: MentionTagConfig(
-          mentionSearch: (value) async => [],
-          tagSearch: (value) async => [],
-          dollarSearch: (value) async => [],
-          defaultMentionColor: '#0000FF',
-          defaultHashTagColor: '#0000FF',
-          defaultDollarTagColor: '#0000FF',
-          tagStyle: Style.attr({
-            Attribute.fontWeight.key: const FontWeightAttribute('600'),
-          }),
-        ),
-        child: QuillEditor.basic(
-          focusNode: _focusNode,
-          scrollController: _scrollController,
-          controller: _controller,
-          config: QuillEditorConfig(
-            showCursor: false,
-            padding: const EdgeInsets.all(16),
-            customRecognizerBuilder: (attribute, leaf) {
-              final tokenDetails = _tokenDetailsFromAttribute(attribute);
-              if (tokenDetails == null) return null;
+      body: ListView(
+        children: [
+          MentionTagWrapper(
+            controller: _controller,
+            config: MentionTagConfig(
+              mentionSearch: (value) async => [],
+              tagSearch: (value) async => [],
+              dollarSearch: (value) async => [],
+              defaultMentionColor: '#0000FF',
+              defaultHashTagColor: '#0000FF',
+              defaultDollarTagColor: '#0000FF',
+              tagStyle: Style.attr({
+                Attribute.fontWeight.key: const FontWeightAttribute('600'),
+              }),
+            ),
+            child: QuillEditor.basic(
+              focusNode: _focusNode,
+              scrollController: _scrollController,
+              controller: _controller,
+              config: QuillEditorConfig(
+                scrollable: false,
+                showCursor: false,
+                padding: const EdgeInsets.all(16),
+                customRecognizerBuilder: (attribute, leaf) {
+                  final tokenDetails = _tokenDetailsFromAttribute(attribute);
+                  if (tokenDetails == null) return null;
 
-              return TapGestureRecognizer()
-                ..onTap = () {
-                  _showTokenDetails(
-                    tokenDetails.type,
-                    tokenDetails.details,
-                  );
-                };
-            },
+                  return TapGestureRecognizer()
+                    ..onTap = () {
+                      _showTokenDetails(
+                        tokenDetails.type,
+                        tokenDetails.details,
+                      );
+                    };
+                },
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -1661,38 +1661,50 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     final overlayWidget = _mentionTagState?.overlayWidget;
 
     return KeyboardListener(
-        focusNode: _keyboardFocusNode,
-        onKeyEvent: (event) {
-          if (_mentionTagState?.handleKeyEvent(event) == true) {
-            return;
-          }
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: (event) {
+        if (_mentionTagState?.handleKeyEvent(event) == true) {
+          return;
+        }
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final editor = IgnorePointer(
+            ignoring: _blockPointerEventsForLayout,
+            child: widget.child,
+          );
+
+          return Column(
+            mainAxisSize: constraints.hasBoundedHeight
+                ? MainAxisSize.max
+                : MainAxisSize.min,
+            children: [
+              // Fill bounded parents, but allow natural height in ListView or
+              // other unbounded-height parents.
+              if (constraints.hasBoundedHeight)
+                Expanded(child: editor)
+              else
+                editor,
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SizeTransition(
+                      sizeFactor: animation,
+                      axisAlignment: -1.0,
+                      child: child,
+                    ),
+                  );
+                },
+                child: (_isOverlayVisible && overlayWidget != null)
+                    ? overlayWidget
+                    : const SizedBox.shrink(key: ValueKey('empty')),
+              ),
+            ],
+          );
         },
-        child: Column(children: [
-          // Editor widget - takes available space. IgnorePointer workaround
-          // for RenderUiKitView NEEDS-LAYOUT when overlay visibility changes.
-          Expanded(
-            child: IgnorePointer(
-              ignoring: _blockPointerEventsForLayout,
-              child: widget.child,
-            ),
-          ),
-          // Show suggestion list below editor when visible with smooth animation
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SizeTransition(
-                  sizeFactor: animation,
-                  axisAlignment: -1.0,
-                  child: child,
-                ),
-              );
-            },
-            child: (_isOverlayVisible && overlayWidget != null)
-                ? overlayWidget
-                : const SizedBox.shrink(key: ValueKey('empty')),
-          ),
-        ]));
+      ),
+    );
   }
 }
