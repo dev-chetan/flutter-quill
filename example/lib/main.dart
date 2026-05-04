@@ -250,14 +250,12 @@ class _HomePageState extends State<HomePage> {
                   mentionSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));
-                    print("@@@@@@@@@ mentionSearch (){..$query .}");
                     return _paginatedSearch(
                         _mainMentionList, query, 0, (u) => u.name);
                   },
                   onLoadMoreMentions: (query, currentItems, currentPage) async {
                     await Future.delayed(
                         const Duration(milliseconds: _loadMoreDelayMs));
-                    print("@@@@@@@@@ onLoadMoreMentions (){...}");
                     var paginatedSearch = _paginatedSearch(_mainMentionList,
                         query, currentPage + 1, (u) => u.name);
                     List<MentionItem> temp = [];
@@ -324,7 +322,7 @@ class _HomePageState extends State<HomePage> {
                         selected: isSelected,
                         onTap: onTap);
                   }),
-              child: QuillEditor(
+              child: QuillEditor.basic(
                 focusNode: _editorFocusNode,
                 scrollController: _editorScrollController,
                 controller: _controller,
