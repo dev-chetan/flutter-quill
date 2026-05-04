@@ -250,7 +250,7 @@ class _HomePageState extends State<HomePage> {
                   mentionSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));
-                    print("@@@@@@@@@ mentionSearch (){...}");
+                    print("@@@@@@@@@ mentionSearch (){..$query .}");
                     return _paginatedSearch(
                         _mainMentionList, query, 0, (u) => u.name);
                   },
@@ -442,7 +442,7 @@ class _ReadOnlyMentionTagExampleState extends State<ReadOnlyMentionTagExample> {
               defaultHashTagColor: '#0000FF',
               defaultDollarTagColor: '#0000FF',
               tagStyle: Style.attr({
-                Attribute.fontWeight.key: const FontWeightAttribute('600'),
+                Attribute.fontWeight.key: const FontWeightAttribute('800'),
               }),
             ),
             child: QuillEditor.basic(

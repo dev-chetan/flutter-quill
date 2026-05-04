@@ -78,7 +78,6 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   Timer? _mentionSpaceDebounceTimer;
   bool _isApplyingHashTagColor = false;
   bool _isClearingTokenStyleLeak = false;
-  final FocusNode _keyboardFocusNode = FocusNode();
 
   /// Workaround for Flutter issue where RenderUiKitView can receive pointer
   /// events before layout (NEEDS-LAYOUT). Block pointer events to the editor
@@ -225,7 +224,6 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     _mentionSpaceDebounceTimer?.cancel();
     _mentionTagState?.dispose();
     widget.mentionTagController?.setRefreshCallback(null);
-    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -311,18 +309,18 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (activeTrigger.trigger == '@') {
       final mentionQuery = activeTrigger.result.query;
       final mentionPosition = activeTrigger.result.position;
+      final mentionRangeLength = mentionQuery.length + 1;
       // Don't show overlay when query is only whitespace (e.g. " " after " @");
       // allow empty query "" when user just typed @.
       if (mentionQuery.isNotEmpty && mentionQuery.trim().isEmpty) {
         if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
-      if (mentionQuery.endsWith(' ') &&
-          _rangeContainsAttribute(
-            mentionPosition,
-            mentionQuery.length + 1,
-            Attribute.mention.key,
-          )) {
+      if (_rangeContainsAttribute(
+        mentionPosition,
+        mentionRangeLength,
+        Attribute.mention.key,
+      )) {
         if (_isOverlayVisible && _isMention) _hideOverlay();
         return;
       }
@@ -371,6 +369,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
     if (activeTrigger.trigger == '\$') {
       final tagQuery = activeTrigger.result.query;
       final tagPosition = activeTrigger.result.position;
+      final tagRangeLength = tagQuery.length + 1;
       // Don't show overlay when query is only whitespace (e.g. " " after " $").
       if (tagQuery.isNotEmpty && tagQuery.trim().isEmpty) {
         if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
@@ -378,12 +377,11 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
         }
         return;
       }
-      if (tagQuery.endsWith(' ') &&
-          _rangeContainsAttribute(
-            tagPosition,
-            tagQuery.length + 1,
-            Attribute.currency.key,
-          )) {
+      if (_rangeContainsAttribute(
+        tagPosition,
+        tagRangeLength,
+        Attribute.currency.key,
+      )) {
         if (_isOverlayVisible && !_isMention && _tagTrigger == '\$') {
           _hideOverlay();
         }
@@ -1660,51 +1658,43 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   Widget build(BuildContext context) {
     final overlayWidget = _mentionTagState?.overlayWidget;
 
-    return KeyboardListener(
-      focusNode: _keyboardFocusNode,
-      onKeyEvent: (event) {
-        if (_mentionTagState?.handleKeyEvent(event) == true) {
-          return;
-        }
-      },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final editor = IgnorePointer(
-            ignoring: _blockPointerEventsForLayout,
-            child: widget.child,
-          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final editor = IgnorePointer(
+          ignoring: _blockPointerEventsForLayout,
+          child: widget.child,
+        );
 
-          return Column(
-            mainAxisSize: constraints.hasBoundedHeight
-                ? MainAxisSize.max
-                : MainAxisSize.min,
-            children: [
-              // Fill bounded parents, but allow natural height in ListView or
-              // other unbounded-height parents.
-              if (constraints.hasBoundedHeight)
-                Expanded(child: editor)
-              else
-                editor,
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SizeTransition(
-                      sizeFactor: animation,
-                      axisAlignment: -1.0,
-                      child: child,
-                    ),
-                  );
-                },
-                child: (_isOverlayVisible && overlayWidget != null)
-                    ? overlayWidget
-                    : const SizedBox.shrink(key: ValueKey('empty')),
-              ),
-            ],
-          );
-        },
-      ),
+        return Column(
+          mainAxisSize: constraints.hasBoundedHeight
+              ? MainAxisSize.max
+              : MainAxisSize.min,
+          children: [
+            // Fill bounded parents, but allow natural height in ListView or
+            // other unbounded-height parents.
+            if (constraints.hasBoundedHeight)
+              Expanded(child: editor)
+            else
+              editor,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SizeTransition(
+                    sizeFactor: animation,
+                    axisAlignment: -1.0,
+                    child: child,
+                  ),
+                );
+              },
+              child: (_isOverlayVisible && overlayWidget != null)
+                  ? overlayWidget
+                  : const SizedBox.shrink(key: ValueKey('empty')),
+            ),
+          ],
+        );
+      },
     );
   }
 }

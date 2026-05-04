@@ -68,9 +68,7 @@ class MentionTagState {
       loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
       suggestionListPadding: config.suggestionListPadding,
       decoration: config.decoration,
-      onItemCountChanged: (count) {
-        _itemCount = count;
-      },
+      onItemCountChanged: _handleItemCountChanged,
     );
     // Always notify visibility change to ensure wrapper rebuilds
     onVisibilityChanged?.call(true, query, isMentionMode, tagTriggerChar);
@@ -114,9 +112,7 @@ class MentionTagState {
           loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
           suggestionListPadding: config.suggestionListPadding,
           decoration: config.decoration,
-          onItemCountChanged: (count) {
-            _itemCount = count;
-          },
+          onItemCountChanged: _handleItemCountChanged,
         );
         // Notify visibility change to ensure wrapper rebuilds with updated widget
         // Use a flag to indicate this is just an update, not a show/hide
@@ -168,12 +164,24 @@ class MentionTagState {
         loadMoreIndicatorBuilder: config.loadMoreIndicatorBuilder,
         suggestionListPadding: config.suggestionListPadding,
         decoration: config.decoration,
-        onItemCountChanged: (count) {
-          _itemCount = count;
-        },
+        onItemCountChanged: _handleItemCountChanged,
       );
       onVisibilityChanged?.call(true, currentQuery, isMention, tagTriggerChar);
     }
+  }
+
+  void _handleItemCountChanged(int count) {
+    if (_itemCount == count) return;
+
+    _itemCount = count;
+    if (overlayWidget == null) return;
+
+    onVisibilityChanged?.call(
+      count > 0,
+      currentQuery,
+      isMention,
+      tagTriggerChar,
+    );
   }
 
   void _handleMentionSelected(MentionItem item) {

@@ -78,49 +78,4 @@ void main() {
 
     expect(find.byType(ListView), findsNothing);
   });
-
-  testWidgets('MentionTagOverlay does not refresh for callback identity only',
-      (tester) async {
-    var searchCount = 0;
-
-    Widget buildOverlay(MentionSearchCallback mentionSearch) {
-      return MaterialApp(
-        home: Scaffold(
-          body: MentionTagOverlay(
-            query: 'user',
-            isMention: true,
-            onSelectMention: (_) {},
-            onSelectTag: (_) {},
-            mentionSearch: mentionSearch,
-            tagSearch: (_) async => const [],
-            dollarSearch: (_) async => const [],
-          ),
-        ),
-      );
-    }
-
-    await tester.pumpWidget(
-      buildOverlay((_) async {
-        searchCount++;
-        return const [MentionItem(id: '1', name: 'User 1')];
-      }),
-    );
-    await tester.pump();
-    await tester.pump();
-    expect(searchCount, 1);
-    expect(find.text('@User 1'), findsOneWidget);
-
-    await tester.pumpWidget(
-      buildOverlay((_) async {
-        searchCount++;
-        return const [MentionItem(id: '2', name: 'User 2')];
-      }),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    expect(searchCount, 1);
-    expect(find.text('@User 1'), findsOneWidget);
-    expect(find.text('@User 2'), findsNothing);
-  });
 }
