@@ -220,11 +220,16 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
               _hasMoreItems = false;
             } else {
               // Append new items, avoiding duplicates
-              final existingIds = _mentions.map((e) => e.id).toSet();
+              final existingIds = _mentions
+                  .map((e) => e.id)
+                  .where((id) => id.isNotEmpty)
+                  .toSet();
               final uniqueNewItems = newItems
-                  .where((item) => !existingIds.contains(item.id))
+                  .where(
+                    (item) => item.id.isEmpty || !existingIds.contains(item.id),
+                  )
                   .toList();
-              _mentions.addAll(uniqueNewItems);
+              _mentions = [..._mentions, ...uniqueNewItems];
               _currentPage++;
               // If we got fewer items than requested, assume no more items
               _hasMoreItems = uniqueNewItems.isNotEmpty;
@@ -233,7 +238,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
             _listVersion++; // Trigger animation
           });
 
-          widget.onItemCountChanged?.call(_mentions.length);
+          // The overlay owns pagination state; its setState above is enough to
+          // render appended rows. Notifying the wrapper here can recreate the
+          // overlay widget during pagination and leave the visible list stale.
         }
       } else {
         // Handle tags
@@ -259,11 +266,14 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
               _hasMoreItems = false;
             } else {
               // Append new items, avoiding duplicates
-              final existingIds = _tags.map((e) => e.id).toSet();
+              final existingIds =
+                  _tags.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
               final uniqueNewItems = newItems
-                  .where((item) => !existingIds.contains(item.id))
+                  .where(
+                    (item) => item.id.isEmpty || !existingIds.contains(item.id),
+                  )
                   .toList();
-              _tags.addAll(uniqueNewItems);
+              _tags = [..._tags, ...uniqueNewItems];
               _currentPage++;
               // If we got fewer items than requested, assume no more items
               _hasMoreItems = uniqueNewItems.isNotEmpty;
@@ -272,7 +282,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
             _listVersion++; // Trigger animation
           });
 
-          widget.onItemCountChanged?.call(_tags.length);
+          // The overlay owns pagination state; its setState above is enough to
+          // render appended rows. Notifying the wrapper here can recreate the
+          // overlay widget during pagination and leave the visible list stale.
         }
       }
     } catch (e) {
@@ -396,16 +408,22 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     _loadingIndicatorTimer?.cancel();
 
     // Create maps for quick lookup
-    final oldMap = {for (final item in _mentions) item.id: item};
-    final newIds = newResults.map((e) => e.id).toSet();
+    final oldMap = {
+      for (final item in _mentions)
+        if (item.id.isNotEmpty) item.id: item,
+    };
+    final newIds =
+        newResults.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
 
     // Find items that need to be removed (in old but not in new)
-    final toRemove =
-        _mentions.where((item) => !newIds.contains(item.id)).toList();
+    final toRemove = _mentions
+        .where((item) => item.id.isNotEmpty && !newIds.contains(item.id))
+        .toList();
 
     // Find items that need to be added (in new but not in old)
-    final toAdd =
-        newResults.where((item) => !oldMap.containsKey(item.id)).toList();
+    final toAdd = newResults
+        .where((item) => item.id.isEmpty || !oldMap.containsKey(item.id))
+        .toList();
 
     // Only update if there are actual changes
     if (toRemove.isEmpty && toAdd.isEmpty) {
@@ -438,9 +456,13 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       final existingIds = <String>{};
 
       for (final newItem in newResults) {
-        if (existingIds.contains(newItem.id)) continue;
+        if (newItem.id.isNotEmpty && existingIds.contains(newItem.id)) {
+          continue;
+        }
         resultList.add(newItem);
-        existingIds.add(newItem.id);
+        if (newItem.id.isNotEmpty) {
+          existingIds.add(newItem.id);
+        }
       }
 
       _mentions = resultList;
@@ -462,15 +484,22 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     _loadingIndicatorTimer?.cancel();
 
     // Create maps for quick lookup
-    final oldMap = {for (var item in _tags) item.id: item};
-    final newIds = newResults.map((e) => e.id).toSet();
+    final oldMap = {
+      for (final item in _tags)
+        if (item.id.isNotEmpty) item.id: item,
+    };
+    final newIds =
+        newResults.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
 
     // Find items that need to be removed (in old but not in new)
-    final toRemove = _tags.where((item) => !newIds.contains(item.id)).toList();
+    final toRemove = _tags
+        .where((item) => item.id.isNotEmpty && !newIds.contains(item.id))
+        .toList();
 
     // Find items that need to be added (in new but not in old)
-    final toAdd =
-        newResults.where((item) => !oldMap.containsKey(item.id)).toList();
+    final toAdd = newResults
+        .where((item) => item.id.isEmpty || !oldMap.containsKey(item.id))
+        .toList();
 
     // Only update if there are actual changes
     if (toRemove.isEmpty && toAdd.isEmpty) {
@@ -503,9 +532,13 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       final existingIds = <String>{};
 
       for (final newItem in newResults) {
-        if (existingIds.contains(newItem.id)) continue;
+        if (newItem.id.isNotEmpty && existingIds.contains(newItem.id)) {
+          continue;
+        }
         resultList.add(newItem);
-        existingIds.add(newItem.id);
+        if (newItem.id.isNotEmpty) {
+          existingIds.add(newItem.id);
+        }
       }
 
       _tags = resultList;
@@ -521,7 +554,23 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     widget.onItemCountChanged?.call(_tags.length);
   }
 
-  void _selectItem() {
+  void _selectMentionItem(MentionItem item, int index) {
+    if (!mounted) return;
+    setState(() {
+      _selectedIndex = index;
+    });
+    widget.onSelectMention(item);
+  }
+
+  void _selectTagItem(TagItem item, int index) {
+    if (!mounted) return;
+    setState(() {
+      _selectedIndex = index;
+    });
+    widget.onSelectTag(item);
+  }
+
+  void _selectHighlightedItem() {
     if (widget.isMention && _selectedIndex < _mentions.length) {
       widget.onSelectMention(_mentions[_selectedIndex]);
     } else if (!widget.isMention && _selectedIndex < _tags.length) {
@@ -640,7 +689,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                         context,
                         index,
                         isSelected,
-                        key: ValueKey(_mentions[index].id),
+                        key: ValueKey(
+                          'mention-$_listVersion-$index-${_mentions[index].id}-${_mentions[index].name}',
+                        ),
                       );
                     })
                 : ListView.builder(
@@ -668,7 +719,9 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
                         context,
                         index,
                         isSelected,
-                        key: ValueKey(_tags[index].id),
+                        key: ValueKey(
+                          'tag-$_listVersion-$index-${_tags[index].id}-${_tags[index].name}',
+                        ),
                       );
                     },
                   ),
@@ -703,10 +756,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           mention,
           isSelected,
           () {
-            setState(() {
-              _selectedIndex = index;
-            });
-            _selectItem();
+            _selectMentionItem(mention, index);
           },
           widget.customData,
         );
@@ -717,10 +767,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       return InkWell(
         key: key,
         onTap: () {
-          setState(() {
-            _selectedIndex = index;
-          });
-          _selectItem();
+          _selectMentionItem(mention, index);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -781,10 +828,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           tag,
           isSelected,
           () {
-            setState(() {
-              _selectedIndex = index;
-            });
-            _selectItem();
+            _selectTagItem(tag, index);
           },
           widget.customData,
         );
@@ -798,10 +842,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       return InkWell(
         key: key,
         onTap: () {
-          setState(() {
-            _selectedIndex = index;
-          });
-          _selectItem();
+          _selectTagItem(tag, index);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -851,7 +892,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
         return true;
       } else if (event.logicalKey == LogicalKeyboardKey.enter ||
           event.logicalKey == LogicalKeyboardKey.tab) {
-        _selectItem();
+        _selectHighlightedItem();
         return true;
       } else if (event.logicalKey == LogicalKeyboardKey.escape) {
         // Close overlay - handled by parent

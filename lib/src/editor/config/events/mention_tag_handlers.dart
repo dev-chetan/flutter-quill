@@ -34,9 +34,6 @@ class MentionTagState {
 
   void updateConfig(MentionTagConfig newConfig) {
     config = newConfig;
-    if (overlayWidget != null) {
-      refreshList();
-    }
   }
 
   void showOverlay(bool isMentionMode, int position, String query,
@@ -219,12 +216,7 @@ class MentionTagState {
     final mentionText = '@${item.name}';
     final shouldAppendSpace = config.appendSpaceAfterSelection;
     final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
-    final attribute = MentionAttribute(value: {
-      'id': item.id,
-      'name': item.name,
-      if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-      'color': config.defaultMentionColor,
-    });
+    final attribute = _mentionAttributeForItem(item);
 
     // Apply synchronously so the next typed character cannot inherit stale style.
     _resetToggledStyleSilently();
@@ -255,6 +247,14 @@ class MentionTagState {
     _resetToggledStyleSilently();
     _resetTypingStyleAfterSelection();
     controller.notifyListeners();
+    scheduleMicrotask(() {
+      _ensureTokenAttribute(
+        actualPosition,
+        mentionText,
+        Attribute.mention.key,
+        attribute,
+      );
+    });
     config.onMentionSelected?.call(item);
   }
 
@@ -304,18 +304,8 @@ class MentionTagState {
     final shouldAppendSpace = config.appendSpaceAfterSelection;
     final insertedText = shouldAppendSpace ? '$tagText ' : tagText;
     final attribute = triggerChar == '\$'
-        ? CurrencyAttribute(value: {
-            'id': item.id,
-            'name': item.name,
-            if (item.count != null) 'count': item.count,
-            'color': config.defaultDollarTagColor,
-          })
-        : TagAttribute(value: {
-            'id': item.id,
-            'name': item.name,
-            if (item.count != null) 'count': item.count,
-            'color': config.defaultHashTagColor,
-          });
+        ? _currencyAttributeForItem(item)
+        : _tagAttributeForItem(item);
 
     // Apply synchronously so the next typed character cannot inherit stale style.
     _resetToggledStyleSilently();
@@ -345,7 +335,75 @@ class MentionTagState {
     _resetToggledStyleSilently();
     _resetTypingStyleAfterSelection();
     controller.notifyListeners();
+    scheduleMicrotask(() {
+      _ensureTokenAttribute(
+        actualPosition,
+        tagText,
+        attribute.key,
+        attribute,
+      );
+    });
     config.onTagSelected?.call(item);
+  }
+
+  MentionAttribute _mentionAttributeForItem(MentionItem item) {
+    return MentionAttribute(value: {
+      'id': item.id,
+      'name': item.name,
+      if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
+      'color': config.defaultMentionColor,
+    });
+  }
+
+  TagAttribute _tagAttributeForItem(TagItem item) {
+    return TagAttribute(value: {
+      'id': item.id,
+      'name': item.name,
+      if (item.count != null) 'count': item.count,
+      'color': config.defaultHashTagColor,
+    });
+  }
+
+  CurrencyAttribute _currencyAttributeForItem(TagItem item) {
+    return CurrencyAttribute(value: {
+      'id': item.id,
+      'name': item.name,
+      if (item.count != null) 'count': item.count,
+      'color': config.defaultDollarTagColor,
+    });
+  }
+
+  void _ensureTokenAttribute(
+    int offset,
+    String tokenText,
+    String attributeKey,
+    Attribute attribute,
+  ) {
+    final plainText = controller.document.toPlainText();
+    if (offset < 0 || offset + tokenText.length > plainText.length) return;
+    if (plainText.substring(offset, offset + tokenText.length) != tokenText) {
+      return;
+    }
+
+    final style = controller.document.collectStyle(offset, tokenText.length);
+    final current = style.attributes[attributeKey];
+    if (_attributeValuesEqual(current?.value, attribute.value)) return;
+
+    controller.formatText(offset, tokenText.length, attribute);
+  }
+
+  bool _attributeValuesEqual(dynamic left, dynamic right) {
+    if (left == right) return true;
+    if (left is Map && right is Map) {
+      if (left.length != right.length) return false;
+      for (final key in left.keys) {
+        if (!right.containsKey(key) || left[key] != right[key]) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   void _resetToggledStyleSilently() {

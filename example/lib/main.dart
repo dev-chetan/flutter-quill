@@ -66,6 +66,32 @@ List<T> _paginatedSearch<T>(
   return filtered.sublist(start, (start + _pageSize).clamp(0, filtered.length));
 }
 
+List<MentionItem> _mentionPage(String query, int page) {
+  return _paginatedSearch(_mainMentionList, query, page, (u) => u.name)
+      .map(
+        (item) => MentionItem(
+          id: item.id,
+          name: item.name,
+          avatarUrl: item.avatarUrl,
+          customData: item.customData,
+        ),
+      )
+      .toList(growable: false);
+}
+
+List<TagItem> _tagPage(List<TagItem> source, String query, int page) {
+  return _paginatedSearch(source, query, page, (t) => t.name)
+      .map(
+        (item) => TagItem(
+          id: item.id,
+          name: item.name,
+          count: item.count,
+          customData: item.customData,
+        ),
+      )
+      .toList(growable: false);
+}
+
 String _hexColor(int i, {int a = 37, int b = 17, int c = 7}) {
   final r = ((i * a % 155) + 100).toRadixString(16).padLeft(2, '0');
   final g = ((i * b % 155) + 100).toRadixString(16).padLeft(2, '0');
@@ -250,50 +276,38 @@ class _HomePageState extends State<HomePage> {
                   mentionSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));
-                    return _paginatedSearch(
-                        _mainMentionList, query, 0, (u) => u.name);
+                    return _mentionPage(query, 0);
                   },
                   onLoadMoreMentions: (query, currentItems, currentPage) async {
                     await Future.delayed(
                         const Duration(milliseconds: _loadMoreDelayMs));
-                    var paginatedSearch = _paginatedSearch(_mainMentionList,
-                        query, currentPage + 1, (u) => u.name);
-                    List<MentionItem> temp = [];
-                    for (var action in paginatedSearch) {
-                      temp.add(MentionItem(id: action.id, name: action.name));
-                    }
-                    return temp;
-                    //return _paginatedSearch(_mainMentionList, query, currentPage + 1, (u) => u.name);
+                    return _mentionPage(query, currentPage);
                   },
                   itemHeight: 20,
                   tagSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));
                     print("\$\$\$\$\$\$ tagSearch (){...}");
-                    return _paginatedSearch(
-                        _mainTagList, query, 0, (t) => t.name);
+                    return _tagPage(_mainTagList, query, 0);
                   },
                   onLoadMoreTags: (query, currentItems, currentPage) async {
                     await Future.delayed(
                         const Duration(milliseconds: _loadMoreDelayMs));
                     print("\$\$\$\$\$\$ onLoadMoreTags (){...}");
-                    return _paginatedSearch(
-                        _mainTagList, query, currentPage + 1, (t) => t.name);
+                    return _tagPage(_mainTagList, query, currentPage);
                   },
                   loadMoreIndicatorBuilder: (context, isMention, tagTrigger) =>
                       _loadMoreIndicator,
                   dollarSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));
-                    return _paginatedSearch(
-                        _mainDollarList, query, 0, (t) => t.name);
+                    return _tagPage(_mainDollarList, query, 0);
                   },
                   onLoadMoreDollarTags:
                       (query, currentItems, currentPage) async {
                     await Future.delayed(
                         const Duration(milliseconds: _loadMoreDelayMs));
-                    return _paginatedSearch(
-                        _mainDollarList, query, currentPage + 1, (t) => t.name);
+                    return _tagPage(_mainDollarList, query, currentPage);
                   },
                   onMentionSelected: (mention) {
                     debugPrint('Mention selected: ${mention.name}');

@@ -123,4 +123,208 @@ void main() {
     expect(find.text('@User 1'), findsOneWidget);
     expect(find.text('@User 2'), findsNothing);
   });
+
+  testWidgets('MentionTagOverlay selects mention items loaded by pagination',
+      (tester) async {
+    MentionItem? selectedMention;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: 'nooh',
+            isMention: true,
+            maxHeight: 96,
+            onSelectMention: (item) => selectedMention = item,
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [
+              MentionItem(id: '1', name: 'First One'),
+              MentionItem(id: '2', name: 'First Two'),
+              MentionItem(id: '3', name: 'First Three'),
+              MentionItem(id: '4', name: 'First Four'),
+              MentionItem(id: '6', name: 'First Six'),
+              MentionItem(id: '7', name: 'First Seven'),
+            ],
+            tagSearch: (_) async => const [],
+            dollarSearch: (_) async => const [],
+            onLoadMoreMentions: (_, __, ___) async => const [
+              MentionItem(id: '5', name: 'Nooh Davis'),
+            ],
+            mentionItemBuilder: (_, item, __, onTap, ___) {
+              return SizedBox(
+                height: 48,
+                child: TextButton(
+                  onPressed: onTap,
+                  child: Text('@${item.name}'),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+
+    expect(find.text('@Nooh Davis'), findsOneWidget);
+
+    await tester.tap(find.text('@Nooh Davis'));
+
+    expect(selectedMention?.id, '5');
+    expect(selectedMention?.name, 'Nooh Davis');
+  });
+
+  testWidgets('MentionTagOverlay appends paginated mentions with empty ids',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: 'user',
+            isMention: true,
+            maxHeight: 96,
+            onSelectMention: (_) {},
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [
+              MentionItem(id: '', name: 'First User'),
+              MentionItem(id: '', name: 'Second User'),
+              MentionItem(id: '', name: 'Third User'),
+              MentionItem(id: '', name: 'Fourth User'),
+              MentionItem(id: '', name: 'Fifth User'),
+              MentionItem(id: '', name: 'Sixth User'),
+            ],
+            tagSearch: (_) async => const [],
+            dollarSearch: (_) async => const [],
+            onLoadMoreMentions: (_, __, ___) async => const [
+              MentionItem(id: '', name: 'Loaded User'),
+            ],
+            mentionItemBuilder: (_, item, __, ___, ____) {
+              return SizedBox(
+                height: 48,
+                child: Text('@${item.name}'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+
+    expect(find.text('@Loaded User'), findsOneWidget);
+  });
+
+  testWidgets('MentionTagOverlay selects tag items loaded by pagination',
+      (tester) async {
+    TagItem? selectedTag;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: 'demo',
+            isMention: false,
+            maxHeight: 96,
+            onSelectMention: (_) {},
+            onSelectTag: (item) => selectedTag = item,
+            mentionSearch: (_) async => const [],
+            tagSearch: (_) async => const [
+              TagItem(id: '1', name: 'FirstOne'),
+              TagItem(id: '2', name: 'FirstTwo'),
+              TagItem(id: '3', name: 'FirstThree'),
+              TagItem(id: '4', name: 'FirstFour'),
+              TagItem(id: '6', name: 'FirstSix'),
+              TagItem(id: '7', name: 'FirstSeven'),
+            ],
+            dollarSearch: (_) async => const [],
+            onLoadMoreTags: (_, __, ___) async => const [
+              TagItem(id: '5', name: 'DemoLoaded'),
+            ],
+            tagItemBuilder: (_, item, __, onTap, ___) {
+              return SizedBox(
+                height: 48,
+                child: TextButton(
+                  onPressed: onTap,
+                  child: Text(item.name),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+
+    expect(find.text('DemoLoaded'), findsOneWidget);
+
+    await tester.tap(find.text('DemoLoaded'));
+
+    expect(selectedTag?.id, '5');
+    expect(selectedTag?.name, 'DemoLoaded');
+  });
+
+  testWidgets('MentionTagOverlay appends paginated tags with empty ids',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: 'tag',
+            isMention: false,
+            maxHeight: 96,
+            onSelectMention: (_) {},
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [],
+            tagSearch: (_) async => const [
+              TagItem(id: '', name: 'FirstTag'),
+              TagItem(id: '', name: 'SecondTag'),
+              TagItem(id: '', name: 'ThirdTag'),
+              TagItem(id: '', name: 'FourthTag'),
+              TagItem(id: '', name: 'FifthTag'),
+              TagItem(id: '', name: 'SixthTag'),
+            ],
+            dollarSearch: (_) async => const [],
+            onLoadMoreTags: (_, __, ___) async => const [
+              TagItem(id: '', name: 'LoadedTag'),
+            ],
+            tagItemBuilder: (_, item, __, ___, ____) {
+              return SizedBox(
+                height: 48,
+                child: Text(item.name),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+
+    expect(find.text('LoadedTag'), findsOneWidget);
+  });
 }

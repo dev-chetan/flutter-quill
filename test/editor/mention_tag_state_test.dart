@@ -39,5 +39,83 @@ void main() {
     );
 
     expect(controller.document.toPlainText(), '#Demo Test \n');
+    final tag =
+        controller.document.collectStyle(0, 10).attributes[Attribute.tag.key];
+    expect(tag?.value?['color'], '#FF0000');
+  });
+
+  test('config updates preserve active mention selection style', () {
+    final controller = QuillController.basic();
+    addTearDown(controller.dispose);
+
+    controller.replaceText(
+      0,
+      0,
+      '@nooh',
+      const TextSelection.collapsed(offset: 5),
+    );
+
+    final state = MentionTagState(
+      config: MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+        defaultMentionColor: '#0080FF',
+      ),
+      controller: controller,
+    );
+
+    state.showOverlay(true, 0, 'nooh');
+
+    state.updateConfig(
+      MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+        defaultMentionColor: '#0080FF',
+      ),
+    );
+
+    state.overlayWidget?.onSelectMention(
+      const MentionItem(id: '1', name: 'Nooh Davis'),
+    );
+
+    final mention = controller.document
+        .collectStyle(0, 11)
+        .attributes[Attribute.mention.key];
+
+    expect(controller.document.toPlainText(), '@Nooh Davis \n');
+    expect(mention?.value?['color'], '#0080FF');
+  });
+
+  test('config updates do not refresh an active overlay', () {
+    final controller = QuillController.basic();
+    addTearDown(controller.dispose);
+
+    var visibilityNotifications = 0;
+    final state = MentionTagState(
+      config: MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+      ),
+      controller: controller,
+      onVisibilityChanged: (_, __, ___, ____) {
+        visibilityNotifications++;
+      },
+    );
+
+    state.showOverlay(true, 0, 'user');
+    expect(visibilityNotifications, 1);
+
+    state.updateConfig(
+      MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+      ),
+    );
+
+    expect(visibilityNotifications, 1);
   });
 }
