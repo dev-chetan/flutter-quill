@@ -288,21 +288,6 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   @override
   void didUpdateWidget(MentionTagOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Check if search callbacks changed (data source updated)
-    final searchCallbacksChanged = widget.isMention
-        ? (oldWidget.mentionSearch != widget.mentionSearch)
-        : (widget.tagTrigger == '\$'
-            ? (oldWidget.dollarSearch != widget.dollarSearch)
-            : (oldWidget.tagSearch != widget.tagSearch));
-
-    // If search callbacks changed, refresh the list immediately
-    if (searchCallbacksChanged) {
-      _lastSearchedQuery = ''; // Reset to force refresh
-      _searchDebounceTimer?.cancel();
-      _searchWithQuery(widget.query);
-      return;
-    }
-
     // Only search if query actually changed and we haven't already searched for this query
     if (oldWidget.query != widget.query && widget.query != _lastSearchedQuery) {
       _selectedIndex = 0;
