@@ -187,12 +187,19 @@ class MentionTagState {
   void _handleMentionSelected(MentionItem item) {
     if (triggerPosition == -1) return;
 
+    final selectedTriggerPosition = triggerPosition;
+    final selectedQuery = currentQuery;
+
     // Hide overlay first with smooth animation
     hideOverlay();
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
-    var actualPosition = _resolveTriggerPosition('@', plainText);
+    final actualPosition = _resolveTriggerPosition(
+      '@',
+      plainText,
+      selectedTriggerPosition,
+    );
     if (actualPosition < 0 || actualPosition >= plainText.length) return;
 
     // Calculate how much to delete from the stored trigger/query. This stays
@@ -200,7 +207,7 @@ class MentionTagState {
     final deleteLength = _queryLengthFromTrigger(
       plainText,
       actualPosition,
-      currentQuery,
+      selectedQuery,
     );
     final mentionText = '@${item.name}';
     final shouldAppendSpace = config.appendSpaceAfterSelection;
@@ -247,12 +254,20 @@ class MentionTagState {
   void _handleTagSelected(TagItem item) {
     if (triggerPosition == -1) return;
 
+    final selectedTriggerPosition = triggerPosition;
+    final selectedQuery = currentQuery;
+    final selectedTagTriggerChar = tagTriggerChar;
+
     // Hide overlay first with smooth animation
     hideOverlay();
 
     // Find the actual position in document
     final plainText = controller.document.toPlainText();
-    var actualPosition = _resolveTriggerPosition(tagTriggerChar, plainText);
+    final actualPosition = _resolveTriggerPosition(
+      selectedTagTriggerChar,
+      plainText,
+      selectedTriggerPosition,
+    );
     if (actualPosition < 0 || actualPosition >= plainText.length) return;
 
     // Search backwards from cursor to find # or $
@@ -266,7 +281,7 @@ class MentionTagState {
     final deleteLength = _queryLengthFromTrigger(
       plainText,
       actualPosition,
-      currentQuery,
+      selectedQuery,
     );
 
     // Format tag text
@@ -330,11 +345,15 @@ class MentionTagState {
     controller.toggledStyle = const Style();
   }
 
-  int _resolveTriggerPosition(String triggerChar, String plainText) {
-    if (triggerPosition >= 0 &&
-        triggerPosition < plainText.length &&
-        plainText[triggerPosition] == triggerChar) {
-      return triggerPosition;
+  int _resolveTriggerPosition(
+    String triggerChar,
+    String plainText,
+    int selectedTriggerPosition,
+  ) {
+    if (selectedTriggerPosition >= 0 &&
+        selectedTriggerPosition < plainText.length &&
+        plainText[selectedTriggerPosition] == triggerChar) {
+      return selectedTriggerPosition;
     }
 
     final selectionOffset = controller.selection.baseOffset;
@@ -349,7 +368,7 @@ class MentionTagState {
       searchPos--;
     }
 
-    return triggerPosition;
+    return selectedTriggerPosition;
   }
 
   int _queryLengthFromTrigger(
