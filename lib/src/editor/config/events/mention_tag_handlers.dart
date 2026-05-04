@@ -292,13 +292,20 @@ class MentionTagState {
     // Use the detected trigger character, default to # if not found
     triggerChar = triggerChar == '\$' ? '\$' : '#';
 
-    // Calculate how much to delete
-    final deleteLength = _queryLengthFromTrigger(
+    // Prefer the longer of (1) prefix that matches stored [currentQuery] and
+    // (2) span from trigger to caret. After load-more + debounced updates,
+    // [currentQuery] can lag the editor while the caret is already past the
+    // full typed token; matching only the short prefix would leave a suffix.
+    final deleteLength = _tagDeleteLengthForReplace(
       plainText,
       actualPosition,
       selectedQuery,
-      caretForFallback: caretBeforeHide,
+      caretBeforeHide,
     );
+    if (deleteLength <= 0) {
+      hideOverlay();
+      return;
+    }
 
     hideOverlay();
 
@@ -446,6 +453,37 @@ class MentionTagState {
     }
 
     return selectedTriggerPosition;
+  }
+
+  /// Length from [triggerPosition] through the text to replace when picking a
+  /// tag suggestion: at least trigger→caret, and at least a full match of
+  /// [query] when that prefix matches the document (handles lagging [currentQuery]).
+  int _tagDeleteLengthForReplace(
+    String plainText,
+    int triggerPosition,
+    String query,
+    int caretForFallback,
+  ) {
+    final maxSpan = plainText.length - triggerPosition;
+    if (maxSpan <= 0) return 0;
+
+    final caretSpan = caretForFallback > triggerPosition
+        ? caretForFallback - triggerPosition
+        : 1;
+    final caretSpanClamped = caretSpan.clamp(1, maxSpan);
+
+    final queryEnd = triggerPosition + 1 + query.length;
+    var matchedSpan = 0;
+    if (triggerPosition >= 0 &&
+        queryEnd <= plainText.length &&
+        plainText.substring(triggerPosition + 1, queryEnd) == query) {
+      matchedSpan = 1 + query.length;
+    }
+
+    final merged = matchedSpan > caretSpanClamped
+        ? matchedSpan
+        : caretSpanClamped;
+    return merged.clamp(1, maxSpan);
   }
 
   int _queryLengthFromTrigger(

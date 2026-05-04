@@ -88,6 +88,40 @@ void main() {
     expect(mention?.value?['color'], '#0080FF');
   });
 
+  test('tag selection uses document span when currentQuery lags editor', () {
+    final controller = QuillController.basic();
+    addTearDown(controller.dispose);
+
+    controller.replaceText(
+      0,
+      0,
+      '#abc',
+      const TextSelection.collapsed(offset: 4),
+    );
+
+    final state = MentionTagState(
+      config: MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+      ),
+      controller: controller,
+    );
+
+    // Simulate debounce lag: document already has "abc" after # but state
+    // still holds an older query length (would break if delete used that).
+    state.showOverlay(false, 0, 'a', tagTrigger: '#');
+
+    state.overlayWidget?.onSelectTag(
+      const TagItem(id: '1', name: 'Alpha'),
+    );
+
+    expect(controller.document.toPlainText(), '#Alpha \n');
+    final tag =
+        controller.document.collectStyle(0, 6).attributes[Attribute.tag.key];
+    expect(tag?.value?['name'], 'Alpha');
+  });
+
   test('config updates do not refresh an active overlay', () {
     final controller = QuillController.basic();
     addTearDown(controller.dispose);
