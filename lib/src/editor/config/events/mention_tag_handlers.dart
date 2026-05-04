@@ -16,7 +16,7 @@ class MentionTagState {
     this.onVisibilityChanged,
   });
 
-  final MentionTagConfig config;
+  MentionTagConfig config;
   final QuillController controller;
   final void Function(
           bool visible, String query, bool isMention, String tagTrigger)?
@@ -31,6 +31,13 @@ class MentionTagState {
   int _itemCount = 0; // Track number of items in overlay
   Timer? _searchDebounceTimer; // Debounce timer for search
   String? _pendingQuery; // Query waiting to be applied after debounce
+
+  void updateConfig(MentionTagConfig newConfig) {
+    config = newConfig;
+    if (overlayWidget != null) {
+      refreshList();
+    }
+  }
 
   void showOverlay(bool isMentionMode, int position, String query,
       {String? tagTrigger}) {

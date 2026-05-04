@@ -202,7 +202,7 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
       _changeSubscription = _subscribeToDocumentChanges();
     }
 
-    if (controllerChanged || configChanged) {
+    if (controllerChanged) {
       _mentionTagState?.dispose();
       _mentionTagState = _newMentionTagState();
       if (_isOverlayVisible) {
@@ -213,6 +213,8 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           tagTrigger: _tagTrigger,
         );
       }
+    } else if (configChanged) {
+      _mentionTagState?.updateConfig(widget.config);
     }
   }
 
