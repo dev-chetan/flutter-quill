@@ -194,17 +194,21 @@ class MentionTagState {
     final selectedTriggerPosition = triggerPosition;
     final selectedQuery = currentQuery;
 
-    // Hide overlay first with smooth animation
-    hideOverlay();
-
-    // Find the actual position in document
+    // Snapshot document and caret before hideOverlay: hiding the overlay can
+    // rebuild the editor and move selection. If we then scan for '@' using the
+    // new caret, we can hit the wrong mention when multiple @ exist on a line.
     final plainText = controller.document.toPlainText();
+    final caretBeforeHide = controller.selection.baseOffset;
     final actualPosition = _resolveTriggerPosition(
       '@',
       plainText,
       selectedTriggerPosition,
+      caretForFallback: caretBeforeHide,
     );
-    if (actualPosition < 0 || actualPosition >= plainText.length) return;
+    if (actualPosition < 0 || actualPosition >= plainText.length) {
+      hideOverlay();
+      return;
+    }
 
     // Calculate how much to delete from the stored trigger/query. This stays
     // stable even if tapping a paginated suggestion changes editor selection.
@@ -212,7 +216,10 @@ class MentionTagState {
       plainText,
       actualPosition,
       selectedQuery,
+      caretForFallback: caretBeforeHide,
     );
+
+    hideOverlay();
     final mentionText = '@${item.name}';
     final shouldAppendSpace = config.appendSpaceAfterSelection;
     final insertedText = shouldAppendSpace ? '$mentionText ' : mentionText;
@@ -265,17 +272,18 @@ class MentionTagState {
     final selectedQuery = currentQuery;
     final selectedTagTriggerChar = tagTriggerChar;
 
-    // Hide overlay first with smooth animation
-    hideOverlay();
-
-    // Find the actual position in document
     final plainText = controller.document.toPlainText();
+    final caretBeforeHide = controller.selection.baseOffset;
     final actualPosition = _resolveTriggerPosition(
       selectedTagTriggerChar,
       plainText,
       selectedTriggerPosition,
+      caretForFallback: caretBeforeHide,
     );
-    if (actualPosition < 0 || actualPosition >= plainText.length) return;
+    if (actualPosition < 0 || actualPosition >= plainText.length) {
+      hideOverlay();
+      return;
+    }
 
     // Search backwards from cursor to find # or $
     String? triggerChar =
@@ -289,7 +297,10 @@ class MentionTagState {
       plainText,
       actualPosition,
       selectedQuery,
+      caretForFallback: caretBeforeHide,
     );
+
+    hideOverlay();
 
     // Format tag text
     String tagText;
@@ -413,15 +424,16 @@ class MentionTagState {
   int _resolveTriggerPosition(
     String triggerChar,
     String plainText,
-    int selectedTriggerPosition,
-  ) {
+    int selectedTriggerPosition, {
+    required int caretForFallback,
+  }) {
     if (selectedTriggerPosition >= 0 &&
         selectedTriggerPosition < plainText.length &&
         plainText[selectedTriggerPosition] == triggerChar) {
       return selectedTriggerPosition;
     }
 
-    final selectionOffset = controller.selection.baseOffset;
+    final selectionOffset = caretForFallback;
     var searchPos = selectionOffset - 1;
     while (searchPos >= 0 && searchPos < plainText.length) {
       if (plainText[searchPos] == triggerChar) {
@@ -439,8 +451,9 @@ class MentionTagState {
   int _queryLengthFromTrigger(
     String plainText,
     int actualPosition,
-    String query,
-  ) {
+    String query, {
+    required int caretForFallback,
+  }) {
     final queryEnd = actualPosition + 1 + query.length;
     if (actualPosition >= 0 &&
         queryEnd <= plainText.length &&
@@ -448,7 +461,7 @@ class MentionTagState {
       return 1 + query.length;
     }
 
-    final selectionOffset = controller.selection.baseOffset;
+    final selectionOffset = caretForFallback;
     if (selectionOffset > actualPosition) {
       return selectionOffset - actualPosition;
     }

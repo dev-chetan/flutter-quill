@@ -301,16 +301,19 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   void didUpdateWidget(MentionTagOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Only search if query actually changed and we haven't already searched for this query
-    if (oldWidget.query != widget.query && widget.query != _lastSearchedQuery) {
+    // Always debounce-search when [query] changes. Do not skip because
+    // widget.query == _lastSearchedQuery: after load-more + an intermediate
+    // query, returning to the same string would leave _lastSearchedQuery equal
+    // to the new query while _tags/_mentions still reflect the intermediate
+    // search, so taps would not apply the selected item correctly.
+    if (oldWidget.query != widget.query) {
       _selectedIndex = 0;
       // Debounce search to avoid rapid reloads
       _searchDebounceTimer?.cancel();
       final queryToSearch = widget.query; // Capture current query
       _searchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
         // Only search if query hasn't changed since we scheduled this search
-        if (mounted &&
-            widget.query == queryToSearch &&
-            queryToSearch != _lastSearchedQuery) {
+        if (mounted && widget.query == queryToSearch) {
           _lastSearchedQuery = queryToSearch;
           _searchWithQuery(queryToSearch);
         }

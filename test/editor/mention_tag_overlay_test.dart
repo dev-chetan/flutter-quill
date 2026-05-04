@@ -328,6 +328,66 @@ void main() {
     expect(find.text('LoadedTag'), findsOneWidget);
   });
 
+  testWidgets(
+      'MentionTagOverlay re-searches when query returns to a prior value '
+      '(load-more / refine / backspace path)',
+      (tester) async {
+    var holdSearchCount = 0;
+
+    Future<List<TagItem>> tagSearch(String q) async {
+      if (q == 'hold') {
+        holdSearchCount++;
+      }
+      if (q == 'hol') {
+        return const [TagItem(id: 'h', name: 'HolOnly')];
+      }
+      if (q == 'hold') {
+        return const [
+          TagItem(id: '1', name: 'HoldOne'),
+          TagItem(id: '2', name: 'HoldTwo'),
+        ];
+      }
+      return const [];
+    }
+
+    Future<List<TagItem>> dollarSearch(String _) async => const [];
+
+    Widget build(String query) {
+      return MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: query,
+            isMention: false,
+            onSelectMention: (_) {},
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [],
+            tagSearch: tagSearch,
+            dollarSearch: dollarSearch,
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(build('hold'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(holdSearchCount, 1);
+    expect(find.text('HoldOne'), findsOneWidget);
+
+    await tester.pumpWidget(build('hol'));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await tester.pumpWidget(build('hold'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    await tester.pump();
+
+    expect(holdSearchCount, 2);
+    expect(find.text('HoldOne'), findsOneWidget);
+    expect(find.text('HolOnly'), findsNothing);
+  });
+
   testWidgets('MentionTagOverlay selects refreshed tag after pagination',
       (tester) async {
     TagItem? selectedTag;
