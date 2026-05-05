@@ -88,6 +88,41 @@ void main() {
     expect(mention?.value?['color'], '#0080FF');
   });
 
+  test('tag selection resolves from live caret/doc when hint position is stale',
+      () {
+    final controller = QuillController.basic();
+    addTearDown(controller.dispose);
+
+    controller.replaceText(
+      0,
+      0,
+      '#ok',
+      const TextSelection.collapsed(offset: 4),
+    );
+
+    final state = MentionTagState(
+      config: MentionTagConfig(
+        mentionSearch: (_) async => const [],
+        tagSearch: (_) async => const [],
+        dollarSearch: (_) async => const [],
+      ),
+      controller: controller,
+    );
+
+    state.showOverlay(
+      false,
+      999,
+      '',
+      tagTrigger: '#',
+    ); // invalid hint index; caret + backward scan still find '#'
+
+    state.overlayWidget?.onSelectTag(
+      const TagItem(id: '1', name: 'okay'),
+    );
+
+    expect(controller.document.toPlainText(), '#okay \n');
+  });
+
   test('tag selection uses document span when currentQuery lags editor', () {
     final controller = QuillController.basic();
     addTearDown(controller.dispose);

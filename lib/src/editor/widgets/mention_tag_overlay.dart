@@ -14,11 +14,16 @@ class MentionItem {
     required this.name,
     this.avatarUrl,
     this.customData,
+    this.color,
   });
   final String id;
   final String name;
   final String? avatarUrl;
   final dynamic customData;
+
+  /// Optional hex color (e.g. `#FF0000`) for the token when selected; falls
+  /// back to [MentionTagConfig.defaultMentionColor] when null.
+  final String? color;
 }
 
 /// Represents a hashtag item
@@ -30,11 +35,16 @@ class TagItem {
     required this.name,
     this.count,
     this.customData,
+    this.color,
   });
   final String id;
   final String name;
   final int? count;
   final dynamic customData;
+
+  /// Optional hex color for the token when selected; falls back to
+  /// [MentionTagConfig.defaultHashTagColor] or [MentionTagConfig.defaultDollarTagColor].
+  final String? color;
 }
 
 /// Callback for fetching users based on query
@@ -173,11 +183,50 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   }
 
   void _onScroll() {
-    // Check if user scrolled near the bottom (within 100px)
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 100) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions) return;
+
+    // When shrink-wrapped content fits entirely in [maxScrollExtent], scrolling
+    // never moves the viewport and listeners may not reveal "near bottom"; that
+    // case is handled by [_scheduleViewportFillCheck] after data loads.
+
+    final maxExtent = position.maxScrollExtent;
+    if (maxExtent <= 0) return;
+
+    if (position.pixels >= maxExtent - 100) {
       _loadMore();
     }
+  }
+
+  /// If the suggestion list fits without scrolling but more pages exist,
+  /// automatically load pages until content overflows or the list exhausts.
+  void _scheduleViewportFillCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_maybeLoadMoreForShortViewport());
+    });
+  }
+
+  Future<void> _maybeLoadMoreForShortViewport() async {
+    if (!mounted || _isLoadingMore || _isLoading || !_hasMoreItems) return;
+    if (!_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions) return;
+    if (position.maxScrollExtent > 0) return;
+
+    final canLoadMore = widget.isMention
+        ? widget.onLoadMoreMentions != null
+        : (widget.tagTrigger == '\$'
+            ? widget.onLoadMoreDollarTags != null
+            : widget.onLoadMoreTags != null);
+    if (!canLoadMore) return;
+
+    await _loadMore();
+    if (!mounted) return;
+
+    _scheduleViewportFillCheck();
   }
 
   Future<void> _loadMore() async {
@@ -451,6 +500,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           _isLoading = false;
         });
         widget.onItemCountChanged?.call(_mentions.length);
+        _scheduleViewportFillCheck();
         return; // No changes needed
       }
     }
@@ -486,6 +536,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     });
 
     widget.onItemCountChanged?.call(_mentions.length);
+    _scheduleViewportFillCheck();
   }
 
   // Incrementally update tags list - preserve existing items, add new ones, remove old ones
@@ -527,6 +578,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
           _isLoading = false;
         });
         widget.onItemCountChanged?.call(_tags.length);
+        _scheduleViewportFillCheck();
         return; // No changes needed
       }
     }
@@ -562,6 +614,7 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
     });
 
     widget.onItemCountChanged?.call(_tags.length);
+    _scheduleViewportFillCheck();
   }
 
   void _selectMentionItem(MentionItem item, int index) {
@@ -773,7 +826,8 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
       }
 
       // Default mention item builder
-      final mentionColor = _parseTagColor(widget.defaultMentionColor, context);
+      final mentionColor = _parseTagColor(
+          mention.color ?? widget.defaultMentionColor, context);
       return InkWell(
         key: key,
         onTap: () {
@@ -846,8 +900,8 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
 
       // Default tag item builder
       final defaultTagColor = widget.tagTrigger == '\$'
-          ? widget.defaultDollarTagColor
-          : widget.defaultHashTagColor;
+          ? (tag.color ?? widget.defaultDollarTagColor)
+          : (tag.color ?? widget.defaultHashTagColor);
       final tagColor = _parseTagColor(defaultTagColor, context);
       return InkWell(
         key: key,

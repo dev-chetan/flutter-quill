@@ -74,6 +74,7 @@ List<MentionItem> _mentionPage(String query, int page) {
           name: item.name,
           avatarUrl: item.avatarUrl,
           customData: item.customData,
+          color: item.color,
         ),
       )
       .toList(growable: false);
@@ -87,6 +88,7 @@ List<TagItem> _tagPage(List<TagItem> source, String query, int page) {
           name: item.name,
           count: item.count,
           customData: item.customData,
+          color: item.color,
         ),
       )
       .toList(growable: false);
@@ -111,30 +113,40 @@ const Widget _loadMoreIndicator = Padding(
 );
 
 final List<TagItem> _mainTagList = [
-  TagItem(id: '1', name: 'flutter', count: 123),
-  TagItem(id: '2', name: 'dart', count: 89),
-  TagItem(id: '3', name: 'mobile', count: 45),
-  TagItem(id: '4', name: 'development', count: 67),
-  TagItem(id: '5', name: 'widgets', count: 56),
-  TagItem(id: '6', name: 'state', count: 78),
-  TagItem(id: '7', name: 'async', count: 34),
-  TagItem(id: '8', name: 'testing', count: 91),
-  TagItem(id: '9', name: 'ui', count: 112),
-  TagItem(id: '10', name: 'api', count: 44),
-  TagItem(id: '11', name: 'database', count: 33),
-  TagItem(id: '12', name: 'navigation', count: 28),
-  TagItem(id: '13', name: 'forms', count: 65),
-  TagItem(id: '14', name: 'theme', count: 41),
-  TagItem(id: '15', name: 'responsive', count: 19),
-  TagItem(id: '16', name: 'performance', count: 52),
-  TagItem(id: '17', name: 'plugins', count: 88),
-  TagItem(id: '18', name: 'packages', count: 77),
-  TagItem(id: '19', name: 'layout', count: 36),
-  TagItem(id: '20', name: 'animations', count: 61),
-  TagItem(id: '21', name: 'gestures', count: 24),
-  TagItem(id: '22', name: 'platform', count: 43),
-  TagItem(id: '23', name: 'web', count: 95),
-  TagItem(id: '24', name: 'desktop', count: 31),
+  for (var i = 0; i < _mainTagSeeds.length; i++)
+    TagItem(
+      id: _mainTagSeeds[i].$1,
+      name: _mainTagSeeds[i].$2,
+      count: _mainTagSeeds[i].$3,
+      color: _hexColor(i),
+    ),
+];
+
+const _mainTagSeeds = <(String, String, int)>[
+  ('1', 'flutter', 123),
+  ('2', 'dart', 89),
+  ('3', 'mobile', 45),
+  ('4', 'development', 67),
+  ('5', 'widgets', 56),
+  ('6', 'state', 78),
+  ('7', 'async', 34),
+  ('8', 'testing', 91),
+  ('9', 'ui', 112),
+  ('10', 'api', 44),
+  ('11', 'database', 33),
+  ('12', 'navigation', 28),
+  ('13', 'forms', 65),
+  ('14', 'theme', 41),
+  ('15', 'responsive', 19),
+  ('16', 'performance', 52),
+  ('17', 'plugins', 88),
+  ('18', 'packages', 77),
+  ('19', 'layout', 36),
+  ('20', 'animations', 61),
+  ('21', 'gestures', 24),
+  ('22', 'platform', 43),
+  ('23', 'web', 95),
+  ('24', 'desktop', 31),
 ];
 
 final List<MentionItem> _mainMentionList = List.generate(
@@ -143,6 +155,7 @@ final List<MentionItem> _mainMentionList = List.generate(
     id: '${i + 1}',
     name: 'User ${i + 1}',
     avatarUrl: null,
+    color: _hexColor(i),
   ),
 );
 
@@ -152,6 +165,7 @@ final List<TagItem> _mainDollarList = List.generate(
     id: '${i + 1}',
     name: 'Amount ${i + 1}',
     count: (i + 1) * 100,
+    color: _hexColor(i + 7),
   ),
 );
 
@@ -283,7 +297,6 @@ class _HomePageState extends State<HomePage> {
                         const Duration(milliseconds: _loadMoreDelayMs));
                     return _mentionPage(query, currentPage);
                   },
-                  itemHeight: 20,
                   tagSearch: (query) async {
                     await Future.delayed(
                         const Duration(milliseconds: _searchDelayMs));

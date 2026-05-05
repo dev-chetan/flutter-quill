@@ -8,6 +8,14 @@ import '../../../document/style.dart';
 import '../../widgets/mention_tag_overlay.dart';
 import '../mention_tag_config.dart';
 
+/// Result of resolving which #[query] / $[query] slice in the document should
+/// be replaced when a suggestion is picked (see [_resolveLiveTagReplaceContext]).
+typedef _LiveTagReplaceContext = ({
+  int triggerPos,
+  String triggerChar,
+  int deleteLength,
+});
+
 /// State for managing mention/tag overlay
 class MentionTagState {
   MentionTagState({
@@ -266,43 +274,28 @@ class MentionTagState {
   }
 
   void _handleTagSelected(TagItem item) {
-    if (triggerPosition == -1) return;
-
-    final selectedTriggerPosition = triggerPosition;
-    final selectedQuery = currentQuery;
-    final selectedTagTriggerChar = tagTriggerChar;
-
+    // Tag selection after pagination or suggestion refresh must not assume
+    // [triggerPosition] / [currentQuery] still match the editor: resolve the
+    // active #/$ token from live plain text and caret first, using cache only
+    // as a hint when the caret is unreliable (e.g. focus moved on tap).
     final plainText = controller.document.toPlainText();
-    final caretBeforeHide = controller.selection.baseOffset;
-    final actualPosition = _resolveTriggerPosition(
-      selectedTagTriggerChar,
-      plainText,
-      selectedTriggerPosition,
-      caretForFallback: caretBeforeHide,
+    final caret = _selectionEndForTagReplace();
+
+    final resolved = _resolveLiveTagReplaceContext(
+      plainText: plainText,
+      caret: caret,
+      preferredTrigger: tagTriggerChar,
+      hintTriggerPosition: triggerPosition,
     );
-    if (actualPosition < 0 || actualPosition >= plainText.length) {
+    if (resolved == null) {
       hideOverlay();
       return;
     }
 
-    // Search backwards from cursor to find # or $
-    String? triggerChar =
-        actualPosition < plainText.length ? plainText[actualPosition] : null;
-
-    // Use the detected trigger character, default to # if not found
-    triggerChar = triggerChar == '\$' ? '\$' : '#';
-
-    // Prefer the longer of (1) prefix that matches stored [currentQuery] and
-    // (2) span from trigger to caret. After load-more + debounced updates,
-    // [currentQuery] can lag the editor while the caret is already past the
-    // full typed token; matching only the short prefix would leave a suffix.
-    final deleteLength = _tagDeleteLengthForReplace(
-      plainText,
-      actualPosition,
-      selectedQuery,
-      caretBeforeHide,
-    );
-    if (deleteLength <= 0) {
+    final actualPosition = resolved.triggerPos;
+    final triggerChar = resolved.triggerChar;
+    final deleteLength = resolved.deleteLength;
+    if (deleteLength <= 0 || actualPosition < 0) {
       hideOverlay();
       return;
     }
@@ -369,7 +362,7 @@ class MentionTagState {
       'id': item.id,
       'name': item.name,
       if (item.avatarUrl != null) 'avatarUrl': item.avatarUrl,
-      'color': config.defaultMentionColor,
+      'color': item.color ?? config.defaultMentionColor,
     });
   }
 
@@ -378,7 +371,7 @@ class MentionTagState {
       'id': item.id,
       'name': item.name,
       if (item.count != null) 'count': item.count,
-      'color': config.defaultHashTagColor,
+      'color': item.color ?? config.defaultHashTagColor,
     });
   }
 
@@ -387,7 +380,7 @@ class MentionTagState {
       'id': item.id,
       'name': item.name,
       if (item.count != null) 'count': item.count,
-      'color': config.defaultDollarTagColor,
+      'color': item.color ?? config.defaultDollarTagColor,
     });
   }
 
@@ -428,6 +421,153 @@ class MentionTagState {
     controller.toggledStyle = const Style();
   }
 
+  /// Caret end used when mapping a tag pick to document coordinates. Preference
+  /// is collapsed offset; when not collapsed, use the extent farthest in the
+  /// document (e.g. IME or selection quirks during overlay interaction).
+  int _selectionEndForTagReplace() {
+    final sel = controller.selection;
+    if (!sel.isValid) return 0;
+    return sel.extentOffset > sel.baseOffset
+        ? sel.extentOffset
+        : sel.baseOffset;
+  }
+
+  /// Locates the active tag trigger and how many code units to replace using
+  /// [plainText] only. [currentQuery] / [triggerPosition] are not trusted for
+  /// span length after pagination or overlay rebuilds—they are hints only.
+  _LiveTagReplaceContext? _resolveLiveTagReplaceContext({
+    required String plainText,
+    required int caret,
+    required String preferredTrigger,
+    required int hintTriggerPosition,
+  }) {
+    if (plainText.isEmpty) return null;
+    if (preferredTrigger != '#' && preferredTrigger != r'$') return null;
+
+    final c = caret.clamp(0, plainText.length);
+
+    final triggerPos =
+        _findTagTriggerBackward(plainText, c, preferredTrigger) ??
+            _tagTriggerFromHint(plainText, hintTriggerPosition, preferredTrigger);
+
+    if (triggerPos == null ||
+        triggerPos < 0 ||
+        triggerPos >= plainText.length) {
+      return null;
+    }
+
+    final ch = plainText[triggerPos];
+    if (ch != '#' && ch != r'$') return null;
+
+    final deleteLength =
+        _tagDeleteLengthFromLiveDoc(plainText, triggerPos, ch, c);
+    if (deleteLength <= 0) return null;
+
+    return (
+      triggerPos: triggerPos,
+      triggerChar: ch,
+      deleteLength: deleteLength,
+    );
+  }
+
+  /// Finds [triggerChar] at word start by scanning backward from [caret].
+  int? _findTagTriggerBackward(
+    String plainText,
+    int caret,
+    String triggerChar,
+  ) {
+    if (caret <= 0) return null;
+
+    var pos = caret - 1;
+    while (pos >= 0) {
+      final c = plainText[pos];
+      if (c == '\n') return null;
+      if (c == triggerChar) {
+        if (pos == 0 ||
+            plainText[pos - 1] == ' ' ||
+            plainText[pos - 1] == '\n') {
+          return pos;
+        }
+      }
+      pos--;
+    }
+    return null;
+  }
+
+  int? _tagTriggerFromHint(
+    String plainText,
+    int hintPos,
+    String triggerChar,
+  ) {
+    if (hintPos < 0 || hintPos >= plainText.length) return null;
+    if (plainText[hintPos] != triggerChar) return null;
+    if (hintPos > 0) {
+      final before = plainText[hintPos - 1];
+      if (before != ' ' && before != '\n') return null;
+    }
+    return hintPos;
+  }
+
+  /// First index *after* the in-progress tag body (exclusive), given the
+  /// trigger at [triggerPos].
+  int _tagPartialTokenEndExclusive(
+    String plainText,
+    int triggerPos,
+    String triggerChar,
+  ) {
+    var end = triggerPos + 1;
+    if (triggerChar == '#') {
+      while (end < plainText.length) {
+        final c = plainText[end];
+        if (c == ' ' || c == '\n' || c == '\t') break;
+        end++;
+      }
+    } else {
+      while (end < plainText.length && plainText[end] != '\n') {
+        end++;
+      }
+    }
+    return end;
+  }
+
+  /// First index strictly after [from] within the same line (before `\n` or eof).
+  int _lineExclusiveEndBeforeNewline(String plainText, int from) {
+    if (from < 0 || from > plainText.length) return plainText.length;
+    var i = from;
+    while (i < plainText.length && plainText[i] != '\n') {
+      i++;
+    }
+    return i;
+  }
+
+  /// Length from [triggerPos] through the tag slice to replace.
+  ///
+  /// Uses a forward grammar pass (#'s body stops at ASCII whitespace unless
+  /// [caret] extends past that—for multi-word previews like `#Demo Tes`) and
+  /// never crosses a newline.
+  int _tagDeleteLengthFromLiveDoc(
+    String plainText,
+    int triggerPos,
+    String triggerChar,
+    int caret,
+  ) {
+    final maxSpan = plainText.length - triggerPos;
+    if (maxSpan <= 0) return 0;
+
+    final scanEnd =
+        _tagPartialTokenEndExclusive(plainText, triggerPos, triggerChar);
+    final lineEnd = _lineExclusiveEndBeforeNewline(plainText, triggerPos);
+
+    var endExclusive = scanEnd;
+    if (caret > triggerPos && caret <= lineEnd) {
+      final cappedCaret = caret.clamp(triggerPos + 1, lineEnd);
+      endExclusive = cappedCaret > endExclusive ? cappedCaret : endExclusive;
+    }
+
+    final len = endExclusive - triggerPos;
+    return len.clamp(1, maxSpan);
+  }
+
   int _resolveTriggerPosition(
     String triggerChar,
     String plainText,
@@ -453,37 +593,6 @@ class MentionTagState {
     }
 
     return selectedTriggerPosition;
-  }
-
-  /// Length from [triggerPosition] through the text to replace when picking a
-  /// tag suggestion: at least trigger→caret, and at least a full match of
-  /// [query] when that prefix matches the document (handles lagging [currentQuery]).
-  int _tagDeleteLengthForReplace(
-    String plainText,
-    int triggerPosition,
-    String query,
-    int caretForFallback,
-  ) {
-    final maxSpan = plainText.length - triggerPosition;
-    if (maxSpan <= 0) return 0;
-
-    final caretSpan = caretForFallback > triggerPosition
-        ? caretForFallback - triggerPosition
-        : 1;
-    final caretSpanClamped = caretSpan.clamp(1, maxSpan);
-
-    final queryEnd = triggerPosition + 1 + query.length;
-    var matchedSpan = 0;
-    if (triggerPosition >= 0 &&
-        queryEnd <= plainText.length &&
-        plainText.substring(triggerPosition + 1, queryEnd) == query) {
-      matchedSpan = 1 + query.length;
-    }
-
-    final merged = matchedSpan > caretSpanClamped
-        ? matchedSpan
-        : caretSpanClamped;
-    return merged.clamp(1, maxSpan);
   }
 
   int _queryLengthFromTrigger(
