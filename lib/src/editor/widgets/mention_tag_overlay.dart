@@ -543,66 +543,21 @@ class _MentionTagOverlayState extends State<MentionTagOverlay> {
   void _updateTagsList(List<TagItem> newResults) {
     // Cancel loading indicator timer since we have results
     _loadingIndicatorTimer?.cancel();
-
-    // Create maps for quick lookup
-    final oldMap = {
-      for (final item in _tags)
-        if (item.id.isNotEmpty) item.id: item,
-    };
-    final newIds =
-        newResults.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
-
-    // Find items that need to be removed (in old but not in new)
-    final toRemove = _tags
-        .where((item) => item.id.isNotEmpty && !newIds.contains(item.id))
-        .toList();
-
-    // Find items that need to be added (in new but not in old)
-    final toAdd = newResults
-        .where((item) => item.id.isEmpty || !oldMap.containsKey(item.id))
-        .toList();
-
-    // Only update if there are actual changes
-    if (toRemove.isEmpty && toAdd.isEmpty) {
-      // Check if any existing items need updates
-      bool needsUpdate = false;
-      for (var newItem in newResults) {
-        final oldItem = oldMap[newItem.id];
-        if (oldItem != null && oldItem != newItem) {
-          needsUpdate = true;
-          break;
-        }
+    // Always rebuild from fresh search results so pagination -> search cannot
+    // keep stale ordering/content from a previous query.
+    final resultList = <TagItem>[];
+    final existingIds = <String>{};
+    for (final newItem in newResults) {
+      if (newItem.id.isNotEmpty && existingIds.contains(newItem.id)) {
+        continue;
       }
-      if (!needsUpdate) {
-        setState(() {
-          _isLoading = false;
-        });
-        widget.onItemCountChanged?.call(_tags.length);
-        _scheduleViewportFillCheck();
-        return; // No changes needed
+      resultList.add(newItem);
+      if (newItem.id.isNotEmpty) {
+        existingIds.add(newItem.id);
       }
     }
 
     setState(() {
-      // Remove items that are no longer in results
-      _tags.removeWhere((item) => toRemove.contains(item));
-
-      // Build new list maintaining order from newResults.
-      // Always prefer the newest data (e.g. updated colors, names, counts)
-      // instead of keeping stale items from the previous list.
-      final resultList = <TagItem>[];
-      final existingIds = <String>{};
-
-      for (final newItem in newResults) {
-        if (newItem.id.isNotEmpty && existingIds.contains(newItem.id)) {
-          continue;
-        }
-        resultList.add(newItem);
-        if (newItem.id.isNotEmpty) {
-          existingIds.add(newItem.id);
-        }
-      }
-
       _tags = resultList;
       _isLoading = false;
       _listVersion++; // Increment to trigger animation

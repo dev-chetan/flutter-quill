@@ -453,4 +453,78 @@ void main() {
     expect(selectedTag?.id, 'new-1');
     expect(selectedTag?.name, 'New Result');
   });
+
+  testWidgets(
+      'MentionTagOverlay refreshes tag order after pagination then search',
+      (tester) async {
+    var loadMoreCalls = 0;
+
+    Widget buildOverlay(String query) {
+      return MaterialApp(
+        home: Scaffold(
+          body: MentionTagOverlay(
+            query: query,
+            isMention: false,
+            maxHeight: 96,
+            onSelectMention: (_) {},
+            onSelectTag: (_) {},
+            mentionSearch: (_) async => const [],
+            tagSearch: (value) async {
+              if (value == 're') {
+                return const [
+                  TagItem(id: '2', name: 'Second'),
+                  TagItem(id: '1', name: 'First'),
+                ];
+              }
+              return const [
+                TagItem(id: '1', name: 'First'),
+                TagItem(id: '2', name: 'Second'),
+                TagItem(id: '3', name: 'Third'),
+                TagItem(id: '4', name: 'Fourth'),
+                TagItem(id: '5', name: 'Fifth'),
+                TagItem(id: '6', name: 'Sixth'),
+              ];
+            },
+            dollarSearch: (_) async => const [],
+            onLoadMoreTags: (_, __, ___) async {
+              loadMoreCalls++;
+              return const [
+                TagItem(id: '7', name: 'LoadedItem'),
+              ];
+            },
+            tagItemBuilder: (_, item, __, ___, ____) {
+              return SizedBox(
+                height: 48,
+                child: Text(item.name),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildOverlay('all'));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(Scrollable), const Offset(0, -1000));
+    await tester.pump();
+    expect(loadMoreCalls > 0, isTrue);
+
+    await tester.pumpWidget(buildOverlay('re'));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    final secondFinder = find.text('Second');
+    final firstFinder = find.text('First');
+    expect(secondFinder, findsOneWidget);
+    expect(firstFinder, findsOneWidget);
+
+    final secondTopLeft = tester.getTopLeft(secondFinder);
+    final firstTopLeft = tester.getTopLeft(firstFinder);
+    expect(secondTopLeft.dy < firstTopLeft.dy, isTrue);
+  });
 }
