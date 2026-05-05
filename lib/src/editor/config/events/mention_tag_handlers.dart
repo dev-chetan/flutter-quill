@@ -442,32 +442,39 @@ class MentionTagState {
     required int hintTriggerPosition,
   }) {
     if (plainText.isEmpty) return null;
-    if (preferredTrigger != '#' && preferredTrigger != r'$') return null;
-
     final c = caret.clamp(0, plainText.length);
+    final triggers = preferredTrigger == r'$'
+        ? <String>[r'$', '#']
+        : <String>['#', r'$'];
 
-    final triggerPos =
-        _findTagTriggerBackward(plainText, c, preferredTrigger) ??
-            _tagTriggerFromHint(plainText, hintTriggerPosition, preferredTrigger);
+    _LiveTagReplaceContext? best;
+    int bestDistance = 1 << 30;
 
-    if (triggerPos == null ||
-        triggerPos < 0 ||
-        triggerPos >= plainText.length) {
-      return null;
+    for (final trigger in triggers) {
+      final candidates = <int?>[
+        _findTagTriggerBackward(plainText, c, trigger),
+        _tagTriggerFromHint(plainText, hintTriggerPosition, trigger),
+      ];
+
+      for (final pos in candidates) {
+        if (pos == null || pos < 0 || pos >= plainText.length) continue;
+        final ch = plainText[pos];
+        if (ch != '#' && ch != r'$') continue;
+
+        final deleteLength = _tagDeleteLengthFromLiveDoc(plainText, pos, ch, c);
+        if (deleteLength <= 0) continue;
+
+        // Prefer trigger closest to caret. This keeps replacements anchored to
+        // what the user is actively editing even if cached trigger/query drift.
+        final distance = (c - pos).abs();
+        if (best == null || distance < bestDistance) {
+          best = (triggerPos: pos, triggerChar: ch, deleteLength: deleteLength);
+          bestDistance = distance;
+        }
+      }
     }
 
-    final ch = plainText[triggerPos];
-    if (ch != '#' && ch != r'$') return null;
-
-    final deleteLength =
-        _tagDeleteLengthFromLiveDoc(plainText, triggerPos, ch, c);
-    if (deleteLength <= 0) return null;
-
-    return (
-      triggerPos: triggerPos,
-      triggerChar: ch,
-      deleteLength: deleteLength,
-    );
+    return best;
   }
 
   /// Finds [triggerChar] at word start by scanning backward from [caret].
