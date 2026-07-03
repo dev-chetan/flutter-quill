@@ -1684,6 +1684,25 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
   @override
   Widget build(BuildContext context) {
     final overlayWidget = _mentionTagState?.overlayWidget;
+    final showSuggestionsAboveEditor =
+        widget.config.showSuggestionsAboveEditor;
+
+    final suggestionOverlay = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: showSuggestionsAboveEditor ? 1.0 : -1.0,
+            child: child,
+          ),
+        );
+      },
+      child: (_isOverlayVisible && overlayWidget != null)
+          ? overlayWidget
+          : const SizedBox.shrink(key: ValueKey('empty')),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1692,34 +1711,17 @@ class _MentionTagWrapperState extends State<MentionTagWrapper> {
           child: widget.child,
         );
 
+        final editorWidget = constraints.hasBoundedHeight
+            ? Expanded(child: editor)
+            : editor;
+
         return Column(
           mainAxisSize: constraints.hasBoundedHeight
               ? MainAxisSize.max
               : MainAxisSize.min,
-          children: [
-            // Fill bounded parents, but allow natural height in ListView or
-            // other unbounded-height parents.
-            if (constraints.hasBoundedHeight)
-              Expanded(child: editor)
-            else
-              editor,
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SizeTransition(
-                    sizeFactor: animation,
-                    axisAlignment: -1.0,
-                    child: child,
-                  ),
-                );
-              },
-              child: (_isOverlayVisible && overlayWidget != null)
-                  ? overlayWidget
-                  : const SizedBox.shrink(key: ValueKey('empty')),
-            ),
-          ],
+          children: showSuggestionsAboveEditor
+              ? [suggestionOverlay, editorWidget]
+              : [editorWidget, suggestionOverlay],
         );
       },
     );

@@ -29,6 +29,7 @@ class MentionTagConfig {
     this.suggestionListPadding = EdgeInsets.zero,
     this.decoration,
     this.onTagTypingChanged,
+    this.showSuggestionsAboveEditor = false,
   });
 
   /// Optional callback invoked when the user enters or leaves "tag typing" mode.
@@ -114,4 +115,8 @@ class MentionTagConfig {
   /// Optional decoration for the suggestion overlay view
   /// If not provided, defaults to card color with rounded corners and border
   final BoxDecoration? decoration;
+
+  /// When true, renders the @/#/$ suggestion list above the wrapped editor child.
+  /// Useful for bottom-anchored chat composers.
+  final bool showSuggestionsAboveEditor;
 }
