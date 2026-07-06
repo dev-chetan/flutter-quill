@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io' as io show Directory, File;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -59,8 +58,10 @@ List<T> _paginatedSearch<T>(
   final filtered = query.isEmpty
       ? list
       : list
-          .where((x) => getName(x).toLowerCase().contains(query.toLowerCase()))
-          .toList();
+            .where(
+              (x) => getName(x).toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
   final start = page * _pageSize;
   if (start >= filtered.length) return [];
   return filtered.sublist(start, (start + _pageSize).clamp(0, filtered.length));
@@ -122,31 +123,31 @@ final List<TagItem> _mainTagList = [
     ),
 ];
 
-const _mainTagSeeds = <(String, String, int,dynamic)>[
-  ('1', 'flutter', 123,{"asset":"crypto"}),
-  ('2', 'dart', 89,{"asset":"crypto"}),
-  ('3', 'mobile', 45,{"asset":"crypto"}),
-  ('4', 'development', 67,{"asset":"crypto"}),
-  ('5', 'widgets', 56,{"asset":"crypto"}),
-  ('6', 'state', 78,{"asset":"crypto"}),
-  ('7', 'async', 34,{"asset":"crypto"}),
-  ('8', 'testing', 91,{"asset":"crypto"}),
-  ('9', 'ui', 112,{"asset":"crypto"}),
-  ('10', 'api', 44,{"asset":"crypto"}),
-  ('11', 'database', 33,{"asset":"crypto"}),
-  ('12', 'navigation', 28,{"asset":"crypto"}),
-  ('13', 'forms', 65,{"asset":"crypto"}),
-  ('14', 'theme', 41,{"asset":"crypto"}),
-  ('15', 'responsive', 19,{"asset":"crypto"}),
-  ('16', 'performance', 52,{"asset":"crypto"}),
-  ('17', 'plugins', 88,{"asset":"crypto"}),
-  ('18', 'packages', 77,{"asset":"crypto"}),
-  ('19', 'layout', 36,{"asset":"crypto"}),
-  ('20', 'animations', 61,{"asset":"crypto"}),
-  ('21', 'gestures', 24,{"asset":"crypto"}),
-  ('22', 'platform', 43,{"asset":"crypto"}),
-  ('23', 'web', 95,{"asset":"crypto"}),
-  ('24', 'desktop', 31,{"asset":"crypto"}),
+const _mainTagSeeds = <(String, String, int, dynamic)>[
+  ('1', 'flutter', 123, {"asset": "crypto"}),
+  ('2', 'dart', 89, {"asset": "crypto"}),
+  ('3', 'mobile', 45, {"asset": "crypto"}),
+  ('4', 'development', 67, {"asset": "crypto"}),
+  ('5', 'widgets', 56, {"asset": "crypto"}),
+  ('6', 'state', 78, {"asset": "crypto"}),
+  ('7', 'async', 34, {"asset": "crypto"}),
+  ('8', 'testing', 91, {"asset": "crypto"}),
+  ('9', 'ui', 112, {"asset": "crypto"}),
+  ('10', 'api', 44, {"asset": "crypto"}),
+  ('11', 'database', 33, {"asset": "crypto"}),
+  ('12', 'navigation', 28, {"asset": "crypto"}),
+  ('13', 'forms', 65, {"asset": "crypto"}),
+  ('14', 'theme', 41, {"asset": "crypto"}),
+  ('15', 'responsive', 19, {"asset": "crypto"}),
+  ('16', 'performance', 52, {"asset": "crypto"}),
+  ('17', 'plugins', 88, {"asset": "crypto"}),
+  ('18', 'packages', 77, {"asset": "crypto"}),
+  ('19', 'layout', 36, {"asset": "crypto"}),
+  ('20', 'animations', 61, {"asset": "crypto"}),
+  ('21', 'gestures', 24, {"asset": "crypto"}),
+  ('22', 'platform', 43, {"asset": "crypto"}),
+  ('23', 'web', 95, {"asset": "crypto"}),
+  ('24', 'desktop', 31, {"asset": "crypto"}),
 ];
 
 final List<MentionItem> _mainMentionList = List.generate(
@@ -155,7 +156,7 @@ final List<MentionItem> _mainMentionList = List.generate(
     id: '${i + 1}',
     name: 'User ${i + 1}',
     avatarUrl: null,
-    customData: {"asset":"crypto"}
+    customData: {"asset": "crypto"},
   ),
 );
 
@@ -166,15 +167,16 @@ final List<TagItem> _mainDollarList = List.generate(
     name: 'Amount ${i + 1}',
     count: (i + 1) * 100,
     color: _hexColor(i + 7),
-      customData: {"asset":"stock"}
+    customData: {"asset": "stock"},
   ),
 );
 
 Future<String?> _savePastedImageToTemp(Uint8List imageBytes) async {
   if (kIsWeb) return null;
   final name = 'image-file-${DateTime.now().toIso8601String()}.png';
-  final file = await io.File(path.join(io.Directory.systemTemp.path, name))
-      .writeAsBytes(imageBytes, flush: true);
+  final file = await io.File(
+    path.join(io.Directory.systemTemp.path, name),
+  ).writeAsBytes(imageBytes, flush: true);
   return file.path;
 }
 
@@ -217,69 +219,73 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.output),
             tooltip: 'Print Delta JSON to log',
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content:
-                      Text('The JSON Delta has been printed to the console.')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'The JSON Delta has been printed to the console.',
+                  ),
+                ),
+              );
               debugPrint(jsonEncode(_controller.document.toDelta().toJson()));
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          /*QuillSimpleToolbar(
-            controller: _controller,
-            config: QuillSimpleToolbarConfig(
-              embedButtons: FlutterQuillEmbeds.toolbarButtons(),
-              showClipboardPaste: true,
-              customButtons: [
-                QuillToolbarCustomButtonOptions(
-                  icon: const Icon(Icons.add_alarm_rounded),
-                  onPressed: () {
-                    _controller.document.insert(
-                      _controller.selection.extentOffset,
-                      TimeStampEmbed(
-                        DateTime.now().toString(),
-                      ),
-                    );
+      body: SafeArea(
+        child: Column(
+          children: [
+            QuillSimpleToolbar(
+              controller: _controller,
+              config: QuillSimpleToolbarConfig(
+                embedButtons: FlutterQuillEmbeds.toolbarButtons(),
+                showClipboardPaste: true,
+                showDirection: true,
+                customButtons: [
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.add_alarm_rounded),
+                    onPressed: () {
+                      _controller.document.insert(
+                        _controller.selection.extentOffset,
+                        TimeStampEmbed(DateTime.now().toString()),
+                      );
 
-                    _controller.updateSelection(
-                      TextSelection.collapsed(
-                        offset: _controller.selection.extentOffset + 1,
-                      ),
-                      ChangeSource.local,
-                    );
-                  },
-                ),
-              ],
-              buttonOptions: QuillSimpleToolbarButtonOptions(
-                base: QuillToolbarBaseButtonOptions(
-                  afterButtonPressed: () {
-                    final isDesktop = {
-                      TargetPlatform.linux,
-                      TargetPlatform.windows,
-                      TargetPlatform.macOS
-                    }.contains(defaultTargetPlatform);
-                    if (isDesktop) {
-                      _editorFocusNode.requestFocus();
-                    }
-                  },
-                ),
-                linkStyle: QuillToolbarLinkStyleButtonOptions(
-                  validateLink: (link) {
-                    // Treats all links as valid. When launching the URL,
-                    // `https://` is prefixed if the link is incomplete (e.g., `google.com` → `https://google.com`)
-                    // however this happens only within the editor.
-                    return true;
-                  },
+                      _controller.updateSelection(
+                        TextSelection.collapsed(
+                          offset: _controller.selection.extentOffset + 1,
+                        ),
+                        ChangeSource.local,
+                      );
+                    },
+                  ),
+                ],
+                buttonOptions: QuillSimpleToolbarButtonOptions(
+                  base: QuillToolbarBaseButtonOptions(
+                    afterButtonPressed: () {
+                      final isDesktop = {
+                        TargetPlatform.linux,
+                        TargetPlatform.windows,
+                        TargetPlatform.macOS,
+                      }.contains(defaultTargetPlatform);
+                      if (isDesktop) {
+                        _editorFocusNode.requestFocus();
+                      }
+                    },
+                  ),
+                  linkStyle: QuillToolbarLinkStyleButtonOptions(
+                    validateLink: (link) {
+                      // Treats all links as valid. When launching the URL,
+                      // `https://` is prefixed if the link is incomplete (e.g., `google.com` → `https://google.com`)
+                      // however this happens only within the editor.
+                      return true;
+                    },
+                  ),
                 ),
               ),
             ),
-          ),*/
-          Expanded(
-            child: MentionTagWrapper(
-              controller: _controller,
-              config: MentionTagConfig(
+            Expanded(
+              child: MentionTagWrapper(
+                controller: _controller,
+                config: MentionTagConfig(
                   defaultMentionColor: '#0000FF',
                   defaultHashTagColor: '#0000FF',
                   defaultDollarTagColor: '#0000FF',
@@ -289,42 +295,48 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(color: Colors.white),
                   suggestionListPadding: EdgeInsets.symmetric(vertical: 30),
                   mentionSearch: (query) async {
-                    print("mentionSearch : $query");
+                    debugPrint('mentionSearch : $query');
                     await Future.delayed(
-                        const Duration(milliseconds: _searchDelayMs));
+                      const Duration(milliseconds: _searchDelayMs),
+                    );
                     return _mentionPage(query, 0);
                   },
                   dollarSearch: (query) async {
-                    print("dollarSearch : $query");
+                    debugPrint('dollarSearch : $query');
                     await Future.delayed(
-                        const Duration(milliseconds: _searchDelayMs));
+                      const Duration(milliseconds: _searchDelayMs),
+                    );
                     return _tagPage(_mainDollarList, query, 0);
                   },
                   tagSearch: (query) async {
-                    print("tagSearch : $query");
+                    debugPrint('tagSearch : $query');
                     await Future.delayed(
-                        const Duration(milliseconds: _searchDelayMs));
+                      const Duration(milliseconds: _searchDelayMs),
+                    );
                     return _tagPage(_mainTagList, query, 0);
                   },
                   onLoadMoreMentions: (query, currentItems, currentPage) async {
-                    print("onLoadMoreMentions : $query");
+                    debugPrint('onLoadMoreMentions : $query');
                     await Future.delayed(
-                        const Duration(milliseconds: _loadMoreDelayMs));
+                      const Duration(milliseconds: _loadMoreDelayMs),
+                    );
                     return _mentionPage('', currentPage);
                   },
                   onLoadMoreTags: (query, currentItems, currentPage) async {
                     await Future.delayed(
-                        const Duration(milliseconds: _loadMoreDelayMs));
-                    print("onLoadMoreTags : $query");
+                      const Duration(milliseconds: _loadMoreDelayMs),
+                    );
+                    debugPrint('onLoadMoreTags : $query');
                     return _tagPage(_mainTagList, query, currentPage);
                   },
                   onLoadMoreDollarTags:
                       (query, currentItems, currentPage) async {
-                        print("onLoadMoreDollarTags : $query");
-                    await Future.delayed(
-                        const Duration(milliseconds: _loadMoreDelayMs));
-                    return _tagPage(_mainDollarList, query, currentPage);
-                  },
+                        debugPrint('onLoadMoreDollarTags : $query');
+                        await Future.delayed(
+                          const Duration(milliseconds: _loadMoreDelayMs),
+                        );
+                        return _tagPage(_mainDollarList, query, currentPage);
+                      },
                   loadMoreIndicatorBuilder: (context, isMention, tagTrigger) =>
                       _loadMoreIndicator,
 
@@ -335,44 +347,47 @@ class _HomePageState extends State<HomePage> {
                     // return Container(
                     //     color: Colors.red, child: Text('@${item.name}'));
                     return ListTile(
-                        //leading: CircleAvatar(child: Text(item.name[0])),
-                        title: Text('@${item.name}'),
-                        selected: isSelected,
-                        onTap: onTap);
-                  }),
-              child: QuillEditor.basic(
-                focusNode: _editorFocusNode,
-                scrollController: _editorScrollController,
-                controller: _controller,
-                config: QuillEditorConfig(
-                  placeholder: 'Start writing your notes...',
-                  hidePlaceholderOnFormat: true,
-                  padding: const EdgeInsets.all(16),
-                  embedBuilders: [
-                    ...FlutterQuillEmbeds.editorBuilders(
-                      imageEmbedConfig: QuillEditorImageEmbedConfig(
-                        imageProviderBuilder: (context, imageUrl) {
-                          // https://pub.dev/packages/flutter_quill_extensions#-image-assets
-                          if (imageUrl.startsWith('assets/')) {
-                            return AssetImage(imageUrl);
-                          }
-                          return null;
-                        },
+                      //leading: CircleAvatar(child: Text(item.name[0])),
+                      title: Text('@${item.name}'),
+                      selected: isSelected,
+                      onTap: onTap,
+                    );
+                  },
+                ),
+                child: QuillEditor.basic(
+                  focusNode: _editorFocusNode,
+                  scrollController: _editorScrollController,
+                  controller: _controller,
+                  config: QuillEditorConfig(
+                    placeholder: 'Start writing your notes...',
+                    hidePlaceholderOnFormat: true,
+                    padding: const EdgeInsets.all(16),
+                    embedBuilders: [
+                      ...FlutterQuillEmbeds.editorBuilders(
+                        imageEmbedConfig: QuillEditorImageEmbedConfig(
+                          imageProviderBuilder: (context, imageUrl) {
+                            // https://pub.dev/packages/flutter_quill_extensions#-image-assets
+                            if (imageUrl.startsWith('assets/')) {
+                              return AssetImage(imageUrl);
+                            }
+                            return null;
+                          },
+                        ),
+                        videoEmbedConfig: QuillEditorVideoEmbedConfig(
+                          customVideoBuilder: (videoUrl, readOnly) {
+                            // To load YouTube videos https://github.com/singerdmx/flutter-quill/releases/tag/v10.8.0
+                            return null;
+                          },
+                        ),
                       ),
-                      videoEmbedConfig: QuillEditorVideoEmbedConfig(
-                        customVideoBuilder: (videoUrl, readOnly) {
-                          // To load YouTube videos https://github.com/singerdmx/flutter-quill/releases/tag/v10.8.0
-                          return null;
-                        },
-                      ),
-                    ),
-                    TimeStampEmbedBuilder(),
-                  ],
+                      TimeStampEmbedBuilder(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -415,11 +430,7 @@ class _ReadOnlyMentionTagExampleState extends State<ReadOnlyMentionTagExample> {
         })
         ..insert(', ')
         ..insert('#flutter', {
-          Attribute.tag.key: {
-            'id': '1',
-            'name': 'flutter',
-            'color': '#0000FF',
-          },
+          Attribute.tag.key: {'id': '1', 'name': 'flutter', 'color': '#0000FF'},
           Attribute.fontWeight.key: '600',
         })
         ..insert(', and ')
@@ -443,9 +454,7 @@ class _ReadOnlyMentionTagExampleState extends State<ReadOnlyMentionTagExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Read-only Mention Tags'),
-      ),
+      appBar: AppBar(title: const Text('Read-only Mention Tags')),
       body: ListView(
         children: [
           MentionTagWrapper(
@@ -543,9 +552,7 @@ class _ReadOnlyTokenDetails {
 }
 
 class TimeStampEmbed extends Embeddable {
-  const TimeStampEmbed(
-    String value,
-  ) : super(timeStampType, value);
+  const TimeStampEmbed(String value) : super(timeStampType, value);
 
   static const String timeStampType = 'timeStamp';
 
@@ -565,13 +572,12 @@ class TimeStampEmbedBuilder extends EmbedBuilder {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-    EmbedContext embedContext,
-  ) {
-    return Row(children: [
-      const Icon(Icons.access_time_rounded),
-      Text(embedContext.node.value.data as String)
-    ]);
+  Widget build(BuildContext context, EmbedContext embedContext) {
+    return Row(
+      children: [
+        const Icon(Icons.access_time_rounded),
+        Text(embedContext.node.value.data as String),
+      ],
+    );
   }
 }

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `MentionTagWrapper` now re-subscribes to `Document.changes` when `QuillController.document` is replaced (for example when loading saved Delta JSON), so mention and tag suggestions keep working. Mention/tag detection also runs after the selection is updated so triggers at the start of the document work reliably.
+- Fixed an issue where bullet points became visually detached from the text body when toggling text direction formatting (RTL) by locking the list leading block to the editor's base text direction.
+- Fixed typed text being inserted at the previous caret position on Android after moving the caret with a tap/mouse by keeping the platform IME's editing state in sync with the selection even when the keyboard is hidden.
+
+### Removed
+
+- Removed the already-`@Deprecated` and `@internal` `linkPrefixes` constant from the public API surface (it is hidden from the `flutter_quill.dart` export). Use `LinkValidator.linkPrefixes` instead.
 
 ## [11.5.1] - 2026-05-20
 
